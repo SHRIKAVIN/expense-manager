@@ -1,0 +1,74 @@
+/* Inter variable as the cross-platform fallback to SF Pro (must precede other rules) */
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,600;0,14..32,700;1,14..32,400&display=swap");
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+      Inter, system-ui, sans-serif;
+    /* Approximate SF Pro's rounded characters */
+    font-feature-settings: "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Theme cross-fade per §6 */
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  /* Display sizes (>=19px) get extra negative tracking to counter Inter's wide default. */
+  .text-display-lg,
+  .text-display-md,
+  .text-lead,
+  .text-lead-airy,
+  .text-tagline {
+    letter-spacing: -0.01em;
+  }
+
+  /* Focus visibility: 2px Action Blue ring, never a color/border change alone. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary-focus);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbars on horizontally scrolling chip rows / segmented controls */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

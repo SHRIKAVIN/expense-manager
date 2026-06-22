@@ -1,0 +1,38 @@
+/*
+ * Design tokens — the single source of truth for color.
+ * Never inline hex values in components; always reference these tokens
+ * (directly via var() or through their Tailwind aliases).
+ */
+
+:root {
+  /* Light mode (default) */
+  --color-primary: #0066cc; /* Action Blue — the ONLY interactive color */
+  --color-primary-focus: #0071e3;
+  --color-ink: #1d1d1f; /* primary text on light */
+  --color-ink-muted-80: #333333;
+  --color-ink-muted-48: #7a7a7a; /* disabled text, fine print */
+  --color-canvas: #ffffff;
+  --color-canvas-parchment: #f5f5f7; /* secondary surface, footer, sub-nav */
+  --color-surface-pearl: #fafafc;
+  --color-divider-soft: #f0f0f0;
+  --color-hairline: #e0e0e0;
+  --color-surface-black: #000000; /* top nav bar only */
+  --color-on-primary: #ffffff;
+  --color-chip-translucent: rgba(210, 210, 215, 0.64);
+}
+
+[data-theme="dark"] {
+  --color-primary: #0066cc;
+  --color-primary-focus: #2997ff; /* Sky Link Blue replaces Action Blue ONLY on dark surfaces */
+  --color-ink: #ffffff;
+  --color-ink-muted-80: #cccccc;
+  --color-ink-muted-48: #98989d;
+  --color-canvas: #1d1d1f;
+  --color-canvas-parchment: #000000;
+  --color-surface-pearl: #272729; /* surface-tile-1 */
+  --color-divider-soft: #2a2a2c; /* surface-tile-2 */
+  --color-hairline: #38383a;
+  --color-surface-black: #000000;
+  --color-on-primary: #ffffff;
+  --color-chip-translucent: rgba(72, 72, 74, 0.64);
+}
