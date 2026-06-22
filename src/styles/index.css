@@ -21,6 +21,11 @@
     height: 100%;
   }
 
+  #root {
+    /* Use the dynamic viewport on iOS so content fills below the URL/status bars. */
+    min-height: 100dvh;
+  }
+
   body {
     margin: 0;
     background-color: var(--color-canvas);
@@ -31,8 +36,20 @@
     font-feature-settings: "ss03";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Mobile feel: kill tap flash + the 300ms delay, prevent rubber-band chaining. */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overscroll-behavior-y: none;
     /* Theme cross-fade per §6 */
     transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  /* Honour the notch on the sides too (landscape / edge-to-edge). */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
   }
 
   /* Display sizes (>=19px) get extra negative tracking to counter Inter's wide default. */

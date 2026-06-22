@@ -59,7 +59,7 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
             role="dialog"
             aria-modal="true"
             aria-label={title}
-            className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[92vh] flex flex-col"
+            className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[92dvh] flex flex-col"
             variants={isDesktop ? modalVariants : sheetVariants}
             initial="hidden"
             animate="visible"
@@ -72,9 +72,13 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
                 <CloseIcon size={20} />
               </Button>
             </div>
-            <div className="overflow-y-auto px-6 pb-6 flex-1">{children}</div>
+            <div className="overflow-y-auto px-6 pb-6 flex-1 [&:last-child]:pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+              {children}
+            </div>
             {footer && (
-              <div className="px-6 py-4 border-t border-hairline shrink-0">{footer}</div>
+              <div className="px-6 pt-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] border-t border-hairline shrink-0 lg:pb-4">
+                {footer}
+              </div>
             )}
           </motion.div>
         </div>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { ThemeProvider } from "@/theme/ThemeProvider";
@@ -8,17 +8,23 @@ import { AppShell } from "@/layout/AppShell";
 import { DashboardScreen } from "@/screens/DashboardScreen";
 import { TransactionsScreen } from "@/screens/TransactionsScreen";
 import { BudgetsScreen } from "@/screens/BudgetsScreen";
-import { InsightsScreen } from "@/screens/InsightsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { AuthScreen } from "@/screens/AuthScreen";
-import { DevScreen } from "@/screens/DevScreen";
+
+// Recharts is heavy — keep it out of the initial bundle and load on demand.
+const InsightsScreen = lazy(() =>
+  import("@/screens/InsightsScreen").then((m) => ({ default: m.InsightsScreen })),
+);
+const DevScreen = lazy(() =>
+  import("@/screens/DevScreen").then((m) => ({ default: m.DevScreen })),
+);
 import { notify } from "@/lib/notifications";
 import { daysUntil, relativeDue } from "@/lib/format";
 import { WalletIcon } from "@/lib/icons";
 
 function Splash() {
   return (
-    <div className="min-h-full flex items-center justify-center bg-canvas">
+    <div className="min-h-[60dvh] flex items-center justify-center bg-canvas">
       <div className="h-12 w-12 rounded-md bg-primary text-on-primary flex items-center justify-center animate-pulse">
         <WalletIcon size={24} />
       </div>
@@ -59,14 +65,16 @@ function AuthedApp() {
     <>
       <RecurringReminders />
       <AppShell>
-        <Routes>
-          <Route path="/" element={<DashboardScreen />} />
-          <Route path="/transactions" element={<TransactionsScreen />} />
-          <Route path="/budgets" element={<BudgetsScreen />} />
-          <Route path="/insights" element={<InsightsScreen />} />
-          <Route path="/settings" element={<SettingsScreen />} />
-          <Route path="*" element={<DashboardScreen />} />
-        </Routes>
+        <Suspense fallback={<Splash />}>
+          <Routes>
+            <Route path="/" element={<DashboardScreen />} />
+            <Route path="/transactions" element={<TransactionsScreen />} />
+            <Route path="/budgets" element={<BudgetsScreen />} />
+            <Route path="/insights" element={<InsightsScreen />} />
+            <Route path="/settings" element={<SettingsScreen />} />
+            <Route path="*" element={<DashboardScreen />} />
+          </Routes>
+        </Suspense>
       </AppShell>
     </>
   );
@@ -88,10 +96,12 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <ToastProvider>
-          <Routes>
-            <Route path="/dev" element={<DevScreen />} />
-            <Route path="/*" element={<Gate />} />
-          </Routes>
+          <Suspense fallback={<Splash />}>
+            <Routes>
+              <Route path="/dev" element={<DevScreen />} />
+              <Route path="/*" element={<Gate />} />
+            </Routes>
+          </Suspense>
         </ToastProvider>
       </ThemeProvider>
     </AuthProvider>

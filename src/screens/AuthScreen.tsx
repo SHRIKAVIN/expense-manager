@@ -42,7 +42,7 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-full bg-canvas flex items-center justify-center px-5 py-12">
+    <div className="min-h-[100dvh] bg-canvas flex items-center justify-center px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mb-5">

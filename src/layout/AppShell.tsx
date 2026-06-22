@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
 import {
   HomeIcon,
@@ -12,7 +12,7 @@ import {
 import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { useAppData } from "@/data/AppDataProvider";
-import { pageTransition, pageVariants } from "@/lib/motion";
+import { usePrefersReducedMotion } from "@/lib/motion";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: HomeIcon, end: true },
@@ -25,10 +25,11 @@ const NAV = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAppData();
   const location = useLocation();
+  const reduced = usePrefersReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
 
   return (
-    <div className="min-h-full bg-canvas text-ink lg:flex">
+    <div className="min-h-[100dvh] bg-canvas text-ink lg:flex">
       {/* Left rail (desktop) */}
       <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-hairline bg-canvas-parchment px-3 py-8">
         <div className="px-3 mb-8 flex items-center gap-2">
@@ -45,19 +46,16 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 min-w-0 flex flex-col">
-        <main className="flex-1 pb-28 lg:pb-12">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              variants={pageVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              transition={pageTransition}
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+        <main className="flex-1 pb-[calc(env(safe-area-inset-bottom)+5.5rem)] lg:pb-12">
+          {/* Instant content swap with a light fade-in (no exit wait) per §6. */}
+          <motion.div
+            key={location.pathname}
+            initial={reduced ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: reduced ? 0 : 0.15, ease: "easeOut" }}
+          >
+            {children}
+          </motion.div>
         </main>
       </div>
 
