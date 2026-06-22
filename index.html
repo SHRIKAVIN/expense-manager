@@ -25,19 +25,6 @@
           /* no-op */
         }
       })();
-      // Seed the real viewport height before first paint. iOS standalone PWAs
-      // report a stale height for fixed/100% boxes after relaunch, which floats
-      // the bottom nav up; we pin the shell to this measured value instead.
-      (function () {
-        try {
-          document.documentElement.style.setProperty(
-            "--app-height",
-            window.innerHeight + "px",
-          );
-        } catch (e) {
-          /* no-op */
-        }
-      })();
     </script>
   </head>
   <body>

@@ -21,9 +21,14 @@
     height: 100%;
   }
 
-  #root {
-    /* Use the dynamic viewport on iOS so content fills below the URL/status bars. */
-    min-height: 100dvh;
+  /* Lock the document to the viewport. The app shell is `position: fixed;
+   * inset: 0`, so nothing should scroll or rubber-band at the document level —
+   * that document-level drag is what let the bottom nav be pulled around on
+   * iOS. All scrolling happens inside the shell's <main> instead. */
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body {
