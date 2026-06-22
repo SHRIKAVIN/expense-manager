@@ -59,8 +59,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      {/* Bottom tab bar (mobile) */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline bg-canvas-parchment/95 backdrop-blur pb-[env(safe-area-inset-bottom)]">
+      {/* Bottom tab bar (mobile). Trim the home-indicator gap so labels sit close to it. */}
+      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-hairline bg-canvas-parchment/95 backdrop-blur pb-[max(calc(env(safe-area-inset-bottom)_-_0.625rem),0.375rem)]">
         <div className="flex items-stretch justify-around">
           {NAV.map((item) => (
             <TabLink key={item.to} {...item} />
@@ -123,7 +123,7 @@ function TabLink({
       end={end}
       className={({ isActive }) =>
         cn(
-          "flex-1 flex flex-col items-center gap-0.5 py-2.5 outline-none",
+          "flex-1 flex flex-col items-center gap-0.5 pt-2 pb-1 outline-none",
           isActive ? "text-primary" : "text-ink-muted-48",
         )
       }
