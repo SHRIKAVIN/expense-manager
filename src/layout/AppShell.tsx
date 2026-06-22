@@ -22,11 +22,15 @@ const NAV = [
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
+// The add-expense FAB only belongs where capturing a new expense is in context.
+const FAB_ROUTES = ["/", "/transactions", "/budgets"];
+
 export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAppData();
   const location = useLocation();
   const reduced = usePrefersReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
+  const showFab = can.writeExpenses && FAB_ROUTES.includes(location.pathname);
 
   return (
     <div className="min-h-[100dvh] bg-canvas text-ink lg:flex">
@@ -68,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {can.writeExpenses && <Fab onClick={() => setAddOpen(true)} />}
+      {showFab && <Fab onClick={() => setAddOpen(true)} />}
       <ExpenseSheet open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
