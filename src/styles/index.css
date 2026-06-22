@@ -97,7 +97,7 @@
    * tint where color-mix() is available (iOS 16.2+, modern Chrome/Firefox).
    */
   .glass {
-    background-color: var(--color-canvas-parchment);
+    background-color: var(--color-canvas);
     -webkit-backdrop-filter: saturate(180%) blur(20px);
     backdrop-filter: saturate(180%) blur(20px);
   }
@@ -105,6 +105,6 @@
 
 @supports (background: color-mix(in srgb, red, blue)) {
   .glass {
-    background-color: color-mix(in srgb, var(--color-canvas-parchment) 72%, transparent);
+    background-color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
   }
 }

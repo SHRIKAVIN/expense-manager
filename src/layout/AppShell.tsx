@@ -13,6 +13,7 @@ import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { useAppData } from "@/data/AppDataProvider";
 import { usePrefersReducedMotion } from "@/lib/motion";
+import { useAppHeight } from "@/lib/useAppHeight";
 import { ScrolledContext } from "./scroll";
 
 const NAV = [
@@ -35,6 +36,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const scrollRef = useRef<HTMLElement>(null);
   const showFab = can.writeExpenses && FAB_ROUTES.includes(location.pathname);
 
+  // Pin the shell to a JS-measured viewport height (see useAppHeight) so the
+  // bottom nav stays glued to the real screen edge across iOS PWA relaunches.
+  useAppHeight();
+
   // Reset the internal scroll position + header state when the route changes.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
@@ -44,13 +49,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ScrolledContext.Provider value={scrolled}>
       {/*
-       * Pin the shell to the visual viewport with `fixed inset-0` rather than a
-       * height-based box. On iOS standalone PWAs the height APIs (100dvh / 100vh
-       * / innerHeight) oscillate after backgrounding, which floats a
-       * `fixed; bottom:0` bar off the true screen edge. A fixed inset-0 box
-       * anchors to both real edges, so the bottom bar stays put across relaunches.
+       * Pin the shell from the top with an explicit, JS-measured height
+       * (`--app-height`, see useAppHeight) instead of relying on `bottom:0` /
+       * `100dvh`. On iOS standalone PWAs the height/inset APIs report stale
+       * values after the app is reopened from the background, which floats a
+       * bottom-anchored bar up off the real screen edge. Anchoring the top and
+       * driving the height ourselves keeps the bottom nav glued to the edge.
        */}
-      <div className="fixed inset-0 bg-canvas text-ink flex flex-col lg:flex-row">
+      <div
+        style={{ height: "var(--app-height, 100dvh)" }}
+        className="fixed top-0 inset-x-0 bg-canvas text-ink flex flex-col lg:flex-row"
+      >
         {/* Left rail (desktop) */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8">
           <div className="px-3 mb-8 flex items-center gap-2">
