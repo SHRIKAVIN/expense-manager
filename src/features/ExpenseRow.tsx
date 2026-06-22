@@ -105,8 +105,10 @@ export function ExpenseRow({ expense, category, currency, onEdit, onDelete }: Ex
             style={{ x }}
             onClick={() => onEdit(expense)}
             onDragEnd={(_, info) => {
+              // Swiping past the threshold requests deletion (confirmed by the
+              // parent's dialog); the row always springs back to rest.
               if (info.offset.x < -80) onDelete(expense);
-              else x.set(0);
+              x.set(0);
             }}
             className="cursor-pointer lg:cursor-default"
           >

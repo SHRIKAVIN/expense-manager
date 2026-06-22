@@ -7,6 +7,7 @@ import { Chip } from "@/components/Chip";
 import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
@@ -25,6 +26,7 @@ export function TransactionsScreen() {
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
 
   const activeCategories = categories.filter((c) => !c.archived);
 
@@ -44,13 +46,15 @@ export function TransactionsScreen() {
 
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
 
-  const handleDelete = async (e: Expense) => {
-    await removeExpense(e.id);
+  const confirmDelete = async () => {
+    if (!confirmTarget) return;
+    await removeExpense(confirmTarget.id);
     show("Expense deleted");
+    setConfirmTarget(null);
   };
 
   return (
-    <Screen>
+    <Screen topInset={false}>
       <ScreenHeader title="Transactions" />
 
       <div className="flex flex-col gap-3 mb-5">
@@ -114,7 +118,7 @@ export function TransactionsScreen() {
                         category={categoriesById[e.categoryId]}
                         currency={currency}
                         onEdit={setEditing}
-                        onDelete={handleDelete}
+                        onDelete={(e) => setConfirmTarget(e)}
                       />
                     </motion.div>
                   ))}
@@ -126,6 +130,18 @@ export function TransactionsScreen() {
       )}
 
       <ExpenseSheet open={!!editing} editing={editing} onClose={() => setEditing(null)} />
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Delete expense?"
+        message={
+          confirmTarget
+            ? `"${confirmTarget.merchant}" will be permanently removed.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onClose={() => setConfirmTarget(null)}
+      />
     </Screen>
   );
 }

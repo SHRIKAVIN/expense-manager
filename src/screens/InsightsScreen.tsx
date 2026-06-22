@@ -61,7 +61,7 @@ export function InsightsScreen() {
 
   if (expenses.length === 0) {
     return (
-      <Screen>
+      <Screen topInset={false}>
         <ScreenHeader title="Insights" />
         <Card>
           <EmptyState
@@ -75,7 +75,7 @@ export function InsightsScreen() {
   }
 
   return (
-    <Screen>
+    <Screen topInset={false}>
       <ScreenHeader title="Insights" />
 
       <div className="flex flex-col gap-4">

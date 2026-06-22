@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CategoryDonut } from "@/features/CategoryDonut";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
@@ -34,6 +35,7 @@ export function DashboardScreen() {
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
 
   const monthExpenses = useMemo(
@@ -70,9 +72,11 @@ export function DashboardScreen() {
       .slice(0, 2);
   }, [recurring, dismissedDue]);
 
-  const handleDelete = async (e: Expense) => {
-    await removeExpense(e.id);
+  const confirmDelete = async () => {
+    if (!confirmTarget) return;
+    await removeExpense(confirmTarget.id);
     show("Expense deleted");
+    setConfirmTarget(null);
   };
 
   const isEmpty = expenses.length === 0;
@@ -190,7 +194,7 @@ export function DashboardScreen() {
                   category={categoriesById[e.categoryId]}
                   currency={currency}
                   onEdit={setEditing}
-                  onDelete={handleDelete}
+                  onDelete={(e) => setConfirmTarget(e)}
                 />
               ))}
             </div>
@@ -199,6 +203,18 @@ export function DashboardScreen() {
       )}
 
       <ExpenseSheet open={!!editing} editing={editing} onClose={() => setEditing(null)} />
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Delete expense?"
+        message={
+          confirmTarget
+            ? `"${confirmTarget.merchant}" will be permanently removed.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onClose={() => setConfirmTarget(null)}
+      />
     </Screen>
   );
 }

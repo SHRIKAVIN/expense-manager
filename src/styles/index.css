@@ -89,3 +89,22 @@
     scrollbar-width: none;
   }
 }
+
+@layer components {
+  /*
+   * Frosted-glass surface for the scrolled header and the bottom nav.
+   * Opaque fallback first; the @supports rule below upgrades it to a translucent
+   * tint where color-mix() is available (iOS 16.2+, modern Chrome/Firefox).
+   */
+  .glass {
+    background-color: var(--color-canvas-parchment);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+}
+
+@supports (background: color-mix(in srgb, red, blue)) {
+  .glass {
+    background-color: color-mix(in srgb, var(--color-canvas-parchment) 72%, transparent);
+  }
+}

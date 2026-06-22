@@ -127,7 +127,7 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen topInset={false}>
       <ScreenHeader title="Settings" />
 
       <div className="flex flex-col gap-7">

@@ -49,7 +49,7 @@ export function BudgetsScreen() {
   };
 
   return (
-    <Screen>
+    <Screen topInset={false}>
       <ScreenHeader title="Budgets" subtitle="Resets monthly" />
 
       {withBudget.length === 0 && !can.manageConfig ? (
