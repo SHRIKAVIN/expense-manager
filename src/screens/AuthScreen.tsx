@@ -42,7 +42,10 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-canvas flex items-center justify-center px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
+    <div className="h-full overflow-y-auto bg-canvas">
+      {/* Inner min-h-full wrapper centers the card when it fits and lets the
+          top scroll into view when the form is taller than the viewport. */}
+      <div className="min-h-full flex items-center justify-center px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mb-5">
@@ -127,6 +130,7 @@ export function AuthScreen() {
               : "New here? Create an account"}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

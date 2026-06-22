@@ -35,7 +35,7 @@ export function DevScreen() {
   const [count, setCount] = useState(1240.5);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-5 py-12">
+    <div className="h-full overflow-y-auto mx-auto w-full max-w-2xl px-5 py-12">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-display-md text-ink">Components</h1>
         <Link to="/" className="text-body text-primary">
