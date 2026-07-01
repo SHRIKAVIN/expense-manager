@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseEnabled()) return "anon";
     return cachedUser ? "authed" : "loading";
   });
-  const [authScreenMode, setAuthScreenMode] = useState<"login" | "signup">("signup");
+  const [authScreenMode, setAuthScreenMode] = useState<"login" | "signup">("login");
   const [configError] = useState<string | null>(() =>
     isSupabaseEnabled()
       ? null
@@ -95,7 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (event === "SIGNED_OUT") setAuthScreenMode("login");
+      if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+        setAuthScreenMode("login");
+      }
       clearUserCache();
       setUser(null);
       setStatus("anon");
@@ -145,7 +147,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
     const email = emailRaw.trim().toLowerCase();
     const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    if (error) {
+      const code = error.code ?? "";
+      const msg = error.message.toLowerCase();
+      const noAccount =
+        code === "user_not_found" ||
+        msg.includes("user not found") ||
+        msg.includes("no user found") ||
+        code === "invalid_credentials" ||
+        msg.includes("invalid login credentials");
+
+      if (noAccount) {
+        setAuthScreenMode("signup");
+        throw new Error("No account found for this email. Create one below.");
+      }
+      throw new Error(error.message);
+    }
     if (!data.user) throw new Error("Sign in failed.");
 
     applyUser(await ensureProfile(data.user.id));

@@ -45,22 +45,24 @@ export function AuthScreen() {
 
   if (configError) {
     return (
-      <div className="h-full overflow-y-auto bg-canvas flex items-center justify-center px-5">
-        <div className="max-w-md text-center">
-          <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mx-auto mb-5">
-            <WalletIcon size={28} />
+      <div className="auth-screen">
+        <div className="auth-screen-inner flex min-h-full items-center justify-center text-center">
+          <div className="max-w-md">
+            <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mx-auto mb-5">
+              <WalletIcon size={28} />
+            </div>
+            <h1 className="text-tagline text-ink mb-2">Setup required</h1>
+            <p className="text-body text-ink-muted-48">{configError}</p>
           </div>
-          <h1 className="text-tagline text-ink mb-2">Setup required</h1>
-          <p className="text-body text-ink-muted-48">{configError}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-canvas">
-      <div className="min-h-full flex items-center justify-center px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
-      <div className="w-full max-w-md">
+    <div className="auth-screen">
+      <div className="auth-screen-inner">
+        <div className="w-full max-w-md mx-auto">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mb-5">
             <WalletIcon size={28} />
@@ -145,7 +147,7 @@ export function AuthScreen() {
               : "New here? Create an account"}
           </button>
         </div>
-      </div>
+        </div>
       </div>
     </div>
   );

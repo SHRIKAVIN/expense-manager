@@ -175,3 +175,23 @@ html.ios.pwa-standalone {
     --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
   }
 }
+
+/* Auth screens sit outside AppShell — need their own viewport scroll container. */
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  background-color: var(--color-canvas);
+}
+
+.auth-screen-inner {
+  min-height: 100%;
+  padding-top: max(2rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+  padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
+}
