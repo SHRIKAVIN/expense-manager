@@ -2,13 +2,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
-import { WalletIcon } from "@/lib/icons";
 import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { useAppData } from "@/data/AppDataProvider";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { ScrolledContext } from "./scroll";
-import { AppHeader, APP_NAV } from "./AppHeader";
+import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -39,9 +38,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Left rail (desktop) */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8">
           <div className="px-3 mb-8 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-sm bg-primary text-on-primary flex items-center justify-center">
-              <WalletIcon size={18} />
-            </div>
+            <HomeLogoButton />
             <span className="text-tagline text-ink">Expenses</span>
           </div>
           <nav className="flex flex-col gap-1">

@@ -71,13 +71,13 @@ export function TransactionsScreen() {
     setConfirmTarget(null);
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     if (filtered.length === 0) {
       show("Nothing to export for this filter");
       return;
     }
     try {
-      exportExpensesPdf(filtered, {
+      await exportExpensesPdf(filtered, {
         title: "Expense Manager — Transactions",
         currency,
         categoriesById,

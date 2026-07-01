@@ -6,6 +6,7 @@ import { Chip } from "@/components/Chip";
 import { CategoryGlyph, CameraIcon, TrashIcon } from "@/lib/icons";
 import { useAppData } from "@/data/AppDataProvider";
 import { useToast } from "@/components/Toast";
+import { Lightbox } from "@/components/Lightbox";
 import { compressImage } from "@/lib/image";
 import { todayISO } from "@/lib/format";
 import type { Expense } from "@/lib/types";
@@ -29,9 +30,13 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [receiptId, setReceiptId] = useState<string | undefined>(undefined);
+  /** New receipt not yet uploaded — preview locally, persist on save. */
+  const [pendingReceipt, setPendingReceipt] = useState<string | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ amount?: string; category?: string }>({});
   const [saving, setSaving] = useState(false);
+  const [attaching, setAttaching] = useState(false);
+  const [receiptLightbox, setReceiptLightbox] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,6 +49,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setPaymentMethod(editing.paymentMethod ?? "");
       setNotes(editing.notes ?? "");
       setReceiptId(editing.receiptId);
+      setPendingReceipt(null);
       if (editing.receiptId) {
         repo.getReceipt(editing.receiptId).then((r) => setReceiptPreview(r?.dataUrl ?? null));
       } else {
@@ -57,23 +63,40 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setPaymentMethod("");
       setNotes("");
       setReceiptId(undefined);
+      setPendingReceipt(null);
       setReceiptPreview(null);
     }
     setErrors({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
 
+  const clearReceipt = () => {
+    if (receiptPreview?.startsWith("blob:")) URL.revokeObjectURL(receiptPreview);
+    setReceiptId(undefined);
+    setPendingReceipt(null);
+    setReceiptPreview(null);
+  };
+
   const handleReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAttaching(true);
+    const blobUrl = URL.createObjectURL(file);
+    setReceiptPreview(blobUrl);
     try {
       const dataUrl = await compressImage(file);
-      const receipt = await repo.saveReceipt(dataUrl);
-      setReceiptId(receipt.id);
+      URL.revokeObjectURL(blobUrl);
+      setPendingReceipt(dataUrl);
       setReceiptPreview(dataUrl);
-    } catch {
-      show("Could not attach receipt");
+      setReceiptId(undefined);
+      show("Receipt attached — tap Add expense to save");
+    } catch (err) {
+      URL.revokeObjectURL(blobUrl);
+      setPendingReceipt(null);
+      setReceiptPreview(null);
+      show(err instanceof Error ? err.message : "Could not attach receipt");
     } finally {
+      setAttaching(false);
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -88,6 +111,14 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
 
     setSaving(true);
     try {
+      let finalReceiptId = receiptId;
+      if (pendingReceipt) {
+        const receipt = await repo.saveReceipt(pendingReceipt);
+        finalReceiptId = receipt.id;
+      } else if (!receiptPreview) {
+        finalReceiptId = undefined;
+      }
+
       const payload = {
         amount: amt,
         merchant: merchant.trim() || "Untitled",
@@ -95,7 +126,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         date,
         paymentMethod: paymentMethod.trim() || undefined,
         notes: notes.trim() || undefined,
-        receiptId,
+        receiptId: finalReceiptId,
       };
       if (editing) {
         await editExpense(editing.id, payload);
@@ -118,7 +149,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       onClose={onClose}
       title={editing ? "Edit expense" : "Add expense"}
       footer={
-        <Button variant="primary" fullWidth onClick={submit} disabled={saving}>
+        <Button variant="primary" fullWidth onClick={submit} disabled={saving || attaching}>
           {editing ? "Save changes" : "Add expense"}
         </Button>
       }
@@ -184,35 +215,40 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           <input
             ref={fileRef}
             type="file"
-            accept="image/*"
-            capture="environment"
+            accept="image/*,image/heic,image/heif,.heic,.heif"
             className="hidden"
             onChange={handleReceipt}
           />
           {receiptPreview ? (
             <div className="flex items-center gap-3">
-              <img
-                src={receiptPreview}
-                alt="Receipt"
-                className="h-20 w-20 rounded-sm object-cover shadow-product"
-              />
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setReceiptId(undefined);
-                  setReceiptPreview(null);
-                }}
+              <button
+                type="button"
+                aria-label="View receipt"
+                onClick={() => setReceiptLightbox(receiptPreview)}
+                className="shrink-0 outline-none"
               >
+                <img
+                  src={receiptPreview}
+                  alt="Receipt"
+                  className="h-20 w-20 rounded-sm object-cover shadow-product"
+                />
+              </button>
+              <Button variant="secondary" onClick={clearReceipt}>
                 <TrashIcon size={18} /> Remove
               </Button>
             </div>
           ) : (
-            <Button variant="secondary" onClick={() => fileRef.current?.click()}>
-              <CameraIcon size={18} /> Add receipt
+            <Button
+              variant="secondary"
+              disabled={attaching}
+              onClick={() => fileRef.current?.click()}
+            >
+              <CameraIcon size={18} /> {attaching ? "Processing…" : "Add receipt"}
             </Button>
           )}
         </div>
       </div>
+      <Lightbox src={receiptLightbox} onClose={() => setReceiptLightbox(null)} />
     </Sheet>
   );
 }

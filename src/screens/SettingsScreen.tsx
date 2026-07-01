@@ -103,9 +103,9 @@ export function SettingsScreen() {
     }
   };
 
-  const exportPdf = () => {
+  const exportPdf = async () => {
     try {
-      exportExpensesPdf(expenses, {
+      await exportExpensesPdf(expenses, {
         title: "Expense Manager — All Transactions",
         currency,
         categoriesById,

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { goToDashboard } from "./navigateHome";
 import { cn } from "@/lib/cn";
 import {
   ChartIcon,
@@ -38,6 +39,22 @@ function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] 
   );
 }
 
+export function HomeLogoButton({ className }: { className?: string }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  return (
+    <button
+      type="button"
+      aria-label="Go to dashboard"
+      onClick={() => goToDashboard(navigate, pathname)}
+      className={cn("shrink-0 outline-none", className)}
+    >
+      <PageIconBadge icon={HomeIcon} />
+    </button>
+  );
+}
+
 export function AppHeader() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -48,7 +65,7 @@ export function AppHeader() {
     <>
       <header className="lg:hidden sticky top-0 z-40 shrink-0 border-b border-hairline glass app-header">
         <div className="flex h-[var(--app-header-bar)] items-center gap-3 px-4">
-          <PageIconBadge icon={route.icon} />
+          <HomeLogoButton />
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>
           <button
             type="button"
