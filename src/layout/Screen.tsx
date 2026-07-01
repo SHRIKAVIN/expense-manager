@@ -5,7 +5,7 @@ import { useScrolled } from "./scroll";
 export function Screen({
   children,
   className,
-  /** Adds top safe-area padding. Disable when a sticky ScreenHeader owns the top. */
+  /** Adds top padding. Safe-area top is owned by AppHeader on mobile. */
   topInset = true,
 }: {
   children: ReactNode;
@@ -16,7 +16,7 @@ export function Screen({
     <div
       className={cn(
         "mx-auto w-full max-w-2xl px-5 lg:px-8",
-        topInset && "pt-[calc(env(safe-area-inset-top)+1.25rem)] lg:pt-12",
+        topInset && "pt-5 lg:pt-12",
         className,
       )}
     >
@@ -38,10 +38,10 @@ export function ScreenHeader({
   return (
     <div
       className={cn(
-        // Full-bleed within the Screen padding so the blur spans edge-to-edge.
+        // Mobile title lives in AppHeader; keep this for desktop where the rail has no title.
+        "hidden lg:block",
         "sticky top-0 z-30 -mx-5 px-5 lg:-mx-8 lg:px-8 mb-6 border-b transition-colors duration-200",
-        // Clear the notch when stuck to the top; desktop has no inset.
-        "pt-[calc(env(safe-area-inset-top)+0.75rem)] pb-3 lg:pt-10",
+        "pt-3 pb-3 lg:pt-10",
         scrolled ? "glass border-hairline" : "border-transparent",
       )}
     >

@@ -117,7 +117,7 @@
 
 @layer components {
   /*
-   * Frosted-glass surface for the scrolled header and the bottom nav.
+   * Frosted-glass surface for the app header and scrolled page headers.
    * Opaque fallback first; the @supports rule below upgrades it to a translucent
    * tint where color-mix() is available (iOS 16.2+, modern Chrome/Firefox).
    */
@@ -134,45 +134,30 @@
   }
 }
 
-/* Bottom tab bar — pinned to viewport; safe-area fill for home indicator. */
+/* App header (mobile) + bottom safe-area for FAB / scroll padding. */
 :root {
-  --bottom-nav-bar: 3.25rem;
-  --bottom-nav-safe: env(safe-area-inset-bottom, 0px);
-  --bottom-nav-total: calc(var(--bottom-nav-bar) + var(--bottom-nav-safe));
+  --app-header-bar: 3rem;
+  --app-header-safe-top: env(safe-area-inset-top, 0px);
+  --app-header-total: calc(var(--app-header-bar) + var(--app-header-safe-top));
+  --fab-bottom-safe: env(safe-area-inset-bottom, 0px);
+  --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
 }
 
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 40;
-  padding-bottom: var(--bottom-nav-safe);
+.app-header {
+  padding-top: var(--app-header-safe-top);
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/*
- * iOS standalone: env(safe-area-inset-bottom) is often 0 — nav "hangs" above a
- * blank strip. JS adds .pwa-standalone on <html>; display-mode is a fallback.
- */
 html.pwa-standalone,
 html.ios.pwa-standalone {
-  --bottom-nav-safe: max(env(safe-area-inset-bottom, 0px), 34px);
-  --bottom-nav-total: calc(var(--bottom-nav-bar) + var(--bottom-nav-safe));
-}
-
-html.pwa-standalone .bottom-nav {
-  padding-bottom: var(--bottom-nav-safe);
+  --fab-bottom-safe: max(env(safe-area-inset-bottom, 0px), 34px);
+  --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
 }
 
 @media (display-mode: standalone) {
   :root {
-    --bottom-nav-safe: max(env(safe-area-inset-bottom, 0px), 34px);
-    --bottom-nav-total: calc(var(--bottom-nav-bar) + var(--bottom-nav-safe));
-  }
-
-  .bottom-nav {
-    padding-bottom: var(--bottom-nav-safe);
+    --fab-bottom-safe: max(env(safe-area-inset-bottom, 0px), 34px);
+    --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
   }
 }

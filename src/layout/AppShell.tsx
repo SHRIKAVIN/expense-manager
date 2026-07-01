@@ -2,26 +2,13 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
-import {
-  HomeIcon,
-  ListIcon,
-  WalletIcon,
-  ChartIcon,
-  SettingsIcon,
-} from "@/lib/icons";
+import { WalletIcon } from "@/lib/icons";
 import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { useAppData } from "@/data/AppDataProvider";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { ScrolledContext } from "./scroll";
-
-const NAV = [
-  { to: "/", label: "Dashboard", icon: HomeIcon, end: true },
-  { to: "/transactions", label: "Transactions", icon: ListIcon },
-  { to: "/budgets", label: "Budgets", icon: WalletIcon },
-  { to: "/insights", label: "Insights", icon: ChartIcon },
-  { to: "/settings", label: "Settings", icon: SettingsIcon },
-];
+import { AppHeader, APP_NAV } from "./AppHeader";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -35,7 +22,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const scrollRef = useRef<HTMLElement>(null);
   const showFab = can.writeExpenses && FAB_ROUTES.includes(location.pathname);
 
-  // Reset the internal scroll position + header state when the route changes.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
     setScrolled(false);
@@ -43,11 +29,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <ScrolledContext.Provider value={scrolled}>
-      {/*
-       * Mobile shell fills the screen. Bottom nav is `position: fixed` (see
-       * .bottom-nav in index.css) so it stays on the physical bottom in iOS
-       * standalone — flex-child nav + dvh leaves a gap when env() is 0.
-       */}
       <div
         className={cn(
           "bg-canvas text-ink overflow-hidden",
@@ -64,26 +45,25 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="text-tagline text-ink">Expenses</span>
           </div>
           <nav className="flex flex-col gap-1">
-            {NAV.map((item) => (
+            {APP_NAV.map((item) => (
               <RailLink key={item.to} {...item} />
             ))}
           </nav>
         </aside>
 
-        {/* Content column: flex column pushes nav to the physical bottom on iOS. */}
         <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
+          <AppHeader />
+
           <main
             ref={scrollRef}
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 6)}
             className={cn(
               "flex-1 min-h-0 overflow-y-auto overflow-x-hidden lg:pb-12",
-              // Fixed bottom nav overlaps scroll content — reserve its height (+ FAB).
               showFab
-                ? "pb-[calc(var(--bottom-nav-total)+4.25rem)]"
-                : "pb-[calc(var(--bottom-nav-total)+0.75rem)]",
+                ? "pb-[calc(var(--fab-bottom-offset)+4.25rem)]"
+                : "pb-[var(--fab-bottom-offset)]",
             )}
           >
-            {/* Instant content swap with a light fade-in (no exit wait) per §6. */}
             <motion.div
               key={location.pathname}
               initial={reduced ? false : { opacity: 0 }}
@@ -93,15 +73,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               {children}
             </motion.div>
           </main>
-
-          {/* Bottom tab bar — fixed on mobile; .bottom-nav handles safe area. */}
-          <nav className="lg:hidden border-t border-hairline glass bottom-nav">
-            <div className="flex h-[var(--bottom-nav-bar)] items-stretch justify-around">
-              {NAV.map((item) => (
-                <TabLink key={item.to} {...item} />
-              ))}
-            </div>
-          </nav>
 
           {showFab && <Fab onClick={() => setAddOpen(true)} />}
         </div>
@@ -120,7 +91,7 @@ function RailLink({
 }: {
   to: string;
   label: string;
-  icon: typeof HomeIcon;
+  icon: (typeof APP_NAV)[number]["icon"];
   end?: boolean;
 }) {
   return (
@@ -138,38 +109,6 @@ function RailLink({
         <>
           <Icon size={22} strokeWidth={isActive ? 2.1 : 1.8} />
           <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>
-        </>
-      )}
-    </NavLink>
-  );
-}
-
-function TabLink({
-  to,
-  label,
-  icon: Icon,
-  end,
-}: {
-  to: string;
-  label: string;
-  icon: typeof HomeIcon;
-  end?: boolean;
-}) {
-  return (
-    <NavLink
-      to={to}
-      end={end}
-      className={({ isActive }) =>
-        cn(
-          "flex-1 flex flex-col items-center gap-0.5 justify-center outline-none",
-          isActive ? "text-primary" : "text-ink-muted-48",
-        )
-      }
-    >
-      {({ isActive }) => (
-        <>
-          <Icon size={24} strokeWidth={isActive ? 2.1 : 1.8} />
-          <span className="text-[11px] leading-none">{label}</span>
         </>
       )}
     </NavLink>

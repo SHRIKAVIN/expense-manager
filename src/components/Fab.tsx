@@ -19,7 +19,7 @@ export function Fab({ onClick, label = "Add expense" }: FabProps) {
       aria-label={label}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
-      className="absolute z-40 right-5 bottom-[calc(var(--bottom-nav-total)+0.75rem)] lg:bottom-8 lg:right-8 h-14 w-14 rounded-full bg-primary text-on-primary shadow-product flex items-center justify-center outline-none"
+      className="absolute z-40 right-5 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 h-14 w-14 rounded-full bg-primary text-on-primary shadow-product flex items-center justify-center outline-none"
     >
       <PlusIcon size={26} />
     </motion.button>
