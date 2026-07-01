@@ -91,6 +91,48 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Called by the app on sign-in when auth.users exists but profiles row is missing.
+-- Runs as SECURITY DEFINER so it bypasses RLS (client INSERT was blocked by policy 42501).
+create or replace function public.ensure_profile()
+returns public.profiles
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  u auth.users;
+  row public.profiles;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select * into row from public.profiles where id = auth.uid();
+  if found then
+    return row;
+  end if;
+
+  select * into u from auth.users where id = auth.uid();
+
+  insert into public.profiles (id, email, display_name, role, currency, theme_preference)
+  values (
+    u.id,
+    u.email,
+    coalesce(u.raw_user_meta_data ->> 'display_name', split_part(u.email, '@', 1)),
+    coalesce(u.raw_user_meta_data ->> 'role', 'Owner'),
+    coalesce(u.raw_user_meta_data ->> 'currency', 'INR'),
+    'system'
+  )
+  returning * into row;
+
+  return row;
+end;
+$$;
+
+grant execute on function public.ensure_profile() to authenticated;
+
+notify pgrst, 'reload schema';
+
 -- Row Level Security
 alter table public.profiles enable row level security;
 alter table public.categories enable row level security;

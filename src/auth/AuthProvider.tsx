@@ -24,6 +24,8 @@ interface AuthContextValue {
   user: SessionUser | null;
   status: "loading" | "authed" | "anon";
   configError: string | null;
+  authScreenMode: "login" | "signup";
+  setAuthScreenMode: (mode: "login" | "signup") => void;
   signup: (input: SignupInput) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -36,6 +38,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [status, setStatus] = useState<"loading" | "authed" | "anon">("loading");
+  const [authScreenMode, setAuthScreenMode] = useState<"login" | "signup">("signup");
   const [configError] = useState<string | null>(() =>
     isSupabaseEnabled()
       ? null
@@ -61,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStatus("anon");
           return;
         }
-        const profile = await ensureProfile(authUser);
+        const profile = await ensureProfile();
         if (cancelled) return;
         setUser(profile);
         setStatus("authed");
@@ -80,9 +83,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_event, session) => {
+    } = sb.auth.onAuthStateChange((event, session) => {
       if (session) void loadSession();
       else {
+        if (event === "SIGNED_OUT") setAuthScreenMode("login");
         setUser(null);
         setStatus("anon");
       }
@@ -111,10 +115,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (error.code === "user_already_exists") {
+        throw new Error("An account with this email already exists. Sign in instead.");
+      }
+      throw new Error(error.message);
+    }
 
     if (data.session && data.user) {
-      const profile = await ensureProfile(data.user);
+      const profile = await ensureProfile();
       setUser(profile);
       setStatus("authed");
       return;
@@ -132,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error("Sign in failed.");
 
-    const profile = await ensureProfile(data.user);
+    const profile = await ensureProfile();
     setUser(profile);
     setStatus("authed");
   }, [configError]);
@@ -141,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSupabaseEnabled()) {
       await getSupabase().auth.signOut();
     }
+    setAuthScreenMode("login");
     setUser(null);
     setStatus("anon");
   }, []);
@@ -184,13 +194,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       status,
       configError,
+      authScreenMode,
+      setAuthScreenMode,
       signup,
       login,
       logout,
       updateProfile,
       setThemePreference,
     }),
-    [user, status, configError, signup, login, logout, updateProfile, setThemePreference],
+    [
+      user,
+      status,
+      configError,
+      authScreenMode,
+      signup,
+      login,
+      logout,
+      updateProfile,
+      setThemePreference,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -15,8 +15,8 @@ const ROLES: { value: Role; label: string; blurb: string }[] = [
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "SGD"];
 
 export function AuthScreen() {
-  const { login, signup, configError } = useAuth();
-  const [mode, setMode] = useState<"login" | "signup">("signup");
+  const { login, signup, configError, authScreenMode, setAuthScreenMode } = useAuth();
+  const mode = authScreenMode;
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +35,9 @@ export function AuthScreen() {
         await login(email, password);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      if (message.includes("Sign in instead")) setAuthScreenMode("login");
     } finally {
       setBusy(false);
     }
@@ -133,7 +135,7 @@ export function AuthScreen() {
           <button
             type="button"
             onClick={() => {
-              setMode(mode === "signup" ? "login" : "signup");
+              setAuthScreenMode(mode === "signup" ? "login" : "signup");
               setError(null);
             }}
             className="text-body text-primary outline-none"

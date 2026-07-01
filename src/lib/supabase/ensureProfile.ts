@@ -1,37 +1,45 @@
-import type { User as AuthUser } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase/client";
 import { profileToSession } from "@/lib/supabase/mappers";
-import type { Role, SessionUser } from "@/lib/types";
+import type { DbProfile } from "@/lib/supabase/database.types";
+import type { SessionUser } from "@/lib/types";
 
-/** Load the profile row, creating it from auth metadata if the DB trigger missed signup. */
-export async function ensureProfile(authUser: AuthUser): Promise<SessionUser> {
+const SETUP_HINT =
+  "Open Supabase → SQL Editor, run supabase/backfill-profiles.sql, then sign in again.";
+
+function isMissingRpc(error: { code?: string; message?: string }): boolean {
+  return (
+    error.code === "PGRST202" ||
+    Boolean(
+      error.message?.includes("Could not find the function") ||
+        error.message?.includes("does not exist"),
+    )
+  );
+}
+
+/**
+ * Load or create the profile row. Tries a direct SELECT first, then the
+ * `ensure_profile` RPC (SECURITY DEFINER) for users missing a profiles row.
+ */
+export async function ensureProfile(): Promise<SessionUser> {
   const sb = getSupabase();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) throw new Error("Not signed in.");
 
-  const { data: existing, error: fetchErr } = await sb
+  const { data: existing, error: selectError } = await sb
     .from("profiles")
     .select("*")
-    .eq("id", authUser.id)
+    .eq("id", user.id)
     .maybeSingle();
-  if (fetchErr) throw new Error(fetchErr.message);
-  if (existing) return profileToSession(existing);
 
-  const meta = authUser.user_metadata ?? {};
-  const email = authUser.email ?? "";
-  const role = (meta.role as Role | undefined) ?? "Owner";
+  if (selectError) throw new Error(selectError.message);
+  if (existing) return profileToSession(existing as DbProfile);
 
-  const { data, error } = await sb
-    .from("profiles")
-    .insert({
-      id: authUser.id,
-      email,
-      display_name: (meta.display_name as string | undefined)?.trim() || email.split("@")[0] || "User",
-      role,
-      currency: (meta.currency as string | undefined) ?? "INR",
-      theme_preference: "system",
-    })
-    .select()
-    .single();
-
-  if (error) throw new Error(error.message);
-  return profileToSession(data);
+  const { data, error } = await sb.rpc("ensure_profile");
+  if (error) {
+    throw new Error(isMissingRpc(error) ? SETUP_HINT : error.message);
+  }
+  if (!data) throw new Error("Could not load profile.");
+  return profileToSession(data as DbProfile);
 }
