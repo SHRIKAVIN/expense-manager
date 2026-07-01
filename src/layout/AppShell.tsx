@@ -52,8 +52,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </aside>
 
         <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
-          <AppHeader />
-
           <main
             ref={scrollRef}
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 6)}
@@ -64,6 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 : "pb-[var(--fab-bottom-offset)]",
             )}
           >
+            <AppHeader />
             <motion.div
               key={location.pathname}
               initial={reduced ? false : { opacity: 0 }}

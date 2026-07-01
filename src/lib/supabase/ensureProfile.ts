@@ -20,17 +20,22 @@ function isMissingRpc(error: { code?: string; message?: string }): boolean {
  * Load or create the profile row. Tries a direct SELECT first, then the
  * `ensure_profile` RPC (SECURITY DEFINER) for users missing a profiles row.
  */
-export async function ensureProfile(): Promise<SessionUser> {
+export async function ensureProfile(userId?: string): Promise<SessionUser> {
   const sb = getSupabase();
-  const {
-    data: { user },
-  } = await sb.auth.getUser();
-  if (!user) throw new Error("Not signed in.");
+
+  let resolvedUserId = userId;
+  if (!resolvedUserId) {
+    const {
+      data: { user },
+    } = await sb.auth.getUser();
+    if (!user) throw new Error("Not signed in.");
+    resolvedUserId = user.id;
+  }
 
   const { data: existing, error: selectError } = await sb
     .from("profiles")
     .select("*")
-    .eq("id", user.id)
+    .eq("id", resolvedUserId)
     .maybeSingle();
 
   if (selectError) throw new Error(selectError.message);

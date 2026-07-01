@@ -1,9 +1,10 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Screen, ScreenHeader } from "@/layout/Screen";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CategorySheet } from "@/features/CategorySheet";
 import { RecurringSheet } from "@/features/RecurringSheet";
 import { useAuth } from "@/auth/AuthProvider";
@@ -46,7 +47,10 @@ export function SettingsScreen() {
   const { canInstall, installed, promptInstall } = usePwaInstall();
 
   const currency = user?.currency ?? "INR";
-  const [name, setName] = useState(user?.displayName ?? "");
+  const savedName = user?.displayName ?? "";
+  const [name, setName] = useState(savedName);
+  const nameDirty = name.trim() !== savedName.trim();
+  const canSaveName = nameDirty && name.trim().length > 0;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
 
@@ -58,11 +62,21 @@ export function SettingsScreen() {
     open: false,
     editing: null,
   });
+  const [confirmCategory, setConfirmCategory] = useState<Category | null>(null);
+
+  const confirmCategoryExpenseCount = useMemo(() => {
+    if (!confirmCategory) return 0;
+    return expenses.filter((e) => e.categoryId === confirmCategory.id).length;
+  }, [confirmCategory, expenses]);
 
   const remindersKey = user ? `em.reminders.${user.id}` : "em.reminders";
   useEffect(() => {
     setRemindersOn(localStorage.getItem(remindersKey) === "1");
   }, [remindersKey]);
+
+  useEffect(() => {
+    setName(user?.displayName ?? "");
+  }, [user?.displayName]);
 
   const activeCategories = categories.filter((c) => !c.archived);
 
@@ -93,14 +107,25 @@ export function SettingsScreen() {
     try {
       exportExpensesPdf(expenses, {
         title: "Expense Manager — All Transactions",
-        subtitle: user?.displayName,
         currency,
         categoriesById,
+        user: {
+          name: user?.displayName ?? "User",
+          email: user?.email ?? "",
+        },
       });
       show("PDF downloaded");
     } catch (err) {
       show(err instanceof Error ? err.message : "Export failed");
     }
+  };
+
+  const confirmDeleteCategory = async () => {
+    if (!confirmCategory) return;
+    const hadExpenses = confirmCategoryExpenseCount > 0;
+    await removeCategory(confirmCategory.id);
+    show(hadExpenses ? "Category archived" : "Category deleted");
+    setConfirmCategory(null);
   };
 
   const deleteAll = async () => {
@@ -128,7 +153,7 @@ export function SettingsScreen() {
           <Card className="flex flex-col gap-5">
             <TextField label="Display name" value={name} onChange={(e) => setName(e.target.value)} />
             <div className="flex gap-3">
-              <Button variant="primary" onClick={saveName}>
+              <Button variant="primary" onClick={saveName} disabled={!canSaveName}>
                 Save
               </Button>
               <Button variant="secondary" onClick={logout}>
@@ -176,7 +201,7 @@ export function SettingsScreen() {
                     <button
                       type="button"
                       aria-label="Delete category"
-                      onClick={() => removeCategory(c.id)}
+                      onClick={() => setConfirmCategory(c)}
                       className="h-9 w-9 rounded-full flex items-center justify-center text-ink-muted-48 outline-none"
                     >
                       <TrashIcon size={17} />
@@ -316,6 +341,20 @@ export function SettingsScreen() {
         open={recSheet.open}
         editing={recSheet.editing}
         onClose={() => setRecSheet({ open: false, editing: null })}
+      />
+      <ConfirmDialog
+        open={!!confirmCategory}
+        title="Delete category?"
+        message={
+          confirmCategory
+            ? confirmCategoryExpenseCount > 0
+              ? `"${confirmCategory.name}" has ${confirmCategoryExpenseCount} transaction${confirmCategoryExpenseCount === 1 ? "" : "s"}. It will be archived and hidden from new expenses.`
+              : `"${confirmCategory.name}" will be permanently removed.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        onConfirm={() => void confirmDeleteCategory()}
+        onClose={() => setConfirmCategory(null)}
       />
     </Screen>
   );

@@ -136,7 +136,7 @@
 
 /* App header (mobile) + bottom safe-area for FAB / scroll padding. */
 :root {
-  --app-header-bar: 3rem;
+  --app-header-bar: 3.5rem;
   --app-header-safe-top: env(safe-area-inset-top, 0px);
   --app-header-total: calc(var(--app-header-bar) + var(--app-header-safe-top));
   --fab-bottom-safe: env(safe-area-inset-bottom, 0px);
@@ -145,8 +145,19 @@
 
 .app-header {
   padding-top: var(--app-header-safe-top);
+  padding-bottom: 0.25rem;
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+  /* Frosted bar — content scrolls beneath sticky header (same as ScreenHeader). */
+  background-color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+@supports not (background: color-mix(in srgb, red, blue)) {
+  .app-header {
+    background-color: var(--color-canvas);
+  }
 }
 
 html.pwa-standalone,

@@ -10,6 +10,12 @@ import {
 import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { ensureProfile } from "@/lib/supabase/ensureProfile";
 import { profileToSession } from "@/lib/supabase/mappers";
+import {
+  clearUserCache,
+  readCachedAuthedUser,
+  readProfileCache,
+  writeProfileCache,
+} from "@/lib/cache/userCache";
 import type { Role, SessionUser, ThemePreference, User } from "@/lib/types";
 
 interface SignupInput {
@@ -36,14 +42,24 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [status, setStatus] = useState<"loading" | "authed" | "anon">("loading");
+  const cachedUser = isSupabaseEnabled() ? readCachedAuthedUser() : null;
+  const [user, setUser] = useState<SessionUser | null>(cachedUser);
+  const [status, setStatus] = useState<"loading" | "authed" | "anon">(() => {
+    if (!isSupabaseEnabled()) return "anon";
+    return cachedUser ? "authed" : "loading";
+  });
   const [authScreenMode, setAuthScreenMode] = useState<"login" | "signup">("signup");
   const [configError] = useState<string | null>(() =>
     isSupabaseEnabled()
       ? null
       : "Supabase is not configured. Copy .env.example to .env.local and add your project keys.",
   );
+
+  const applyUser = useCallback((profile: SessionUser) => {
+    writeProfileCache(profile);
+    setUser(profile);
+    setStatus("authed");
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseEnabled()) {
@@ -54,49 +70,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const sb = getSupabase();
 
-    const loadSession = async () => {
+    const refreshProfile = async (userId: string) => {
       try {
-        const { data: { user: authUser }, error } = await sb.auth.getUser();
-        if (error) throw error;
-        if (cancelled) return;
-        if (!authUser) {
-          setUser(null);
-          setStatus("anon");
-          return;
-        }
-        const profile = await ensureProfile();
-        if (cancelled) return;
-        setUser(profile);
-        setStatus("authed");
+        const profile = await ensureProfile(userId);
+        if (!cancelled) applyUser(profile);
       } catch {
         if (!cancelled) {
+          clearUserCache(userId);
           setUser(null);
           setStatus("anon");
         }
       }
     };
 
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (session) void loadSession();
-      else if (!cancelled) setStatus("anon");
-    });
-
     const {
       data: { subscription },
     } = sb.auth.onAuthStateChange((event, session) => {
-      if (session) void loadSession();
-      else {
-        if (event === "SIGNED_OUT") setAuthScreenMode("login");
-        setUser(null);
-        setStatus("anon");
+      if (cancelled) return;
+
+      if (session?.user) {
+        const cached = readProfileCache(session.user.id);
+        if (cached) applyUser(cached);
+        void refreshProfile(session.user.id);
+        return;
       }
+
+      if (event === "SIGNED_OUT") setAuthScreenMode("login");
+      clearUserCache();
+      setUser(null);
+      setStatus("anon");
     });
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [applyUser]);
 
   const signup = useCallback(async (input: SignupInput) => {
     if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
@@ -123,16 +132,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (data.session && data.user) {
-      const profile = await ensureProfile();
-      setUser(profile);
-      setStatus("authed");
+      applyUser(await ensureProfile(data.user.id));
       return;
     }
 
     throw new Error(
       "Account created. Check your email to confirm, then sign in.",
     );
-  }, [configError]);
+  }, [applyUser, configError]);
 
   const login = useCallback(async (emailRaw: string, password: string) => {
     if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
@@ -141,19 +148,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error("Sign in failed.");
 
-    const profile = await ensureProfile();
-    setUser(profile);
-    setStatus("authed");
-  }, [configError]);
+    applyUser(await ensureProfile(data.user.id));
+  }, [applyUser, configError]);
 
   const logout = useCallback(async () => {
+    clearUserCache(user?.id);
     if (isSupabaseEnabled()) {
       await getSupabase().auth.signOut();
     }
     setAuthScreenMode("login");
     setUser(null);
     setStatus("anon");
-  }, []);
+  }, [user?.id]);
 
   const updateProfile = useCallback(
     async (patch: Partial<Pick<User, "displayName" | "currency">>) => {
@@ -169,9 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
       if (error) throw new Error(error.message);
-      setUser(profileToSession(data));
+      applyUser(profileToSession(data));
     },
-    [user],
+    [applyUser, user],
   );
 
   const setThemePreference = useCallback(
@@ -184,9 +190,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
       if (error) throw new Error(error.message);
-      setUser(profileToSession(data));
+      applyUser(profileToSession(data));
     },
-    [user],
+    [applyUser, user],
   );
 
   const value = useMemo<AuthContextValue>(

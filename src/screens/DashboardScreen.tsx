@@ -104,10 +104,10 @@ export function DashboardScreen() {
         value={selectedMonth}
         onChange={setSelectedMonth}
         minMonth={minMonth}
-        className="mb-1"
+        className="mb-4"
       />
-      <div className="mb-2">
-        <p className="text-tagline text-ink-muted-80 mb-1">Total spent this month</p>
+      <div className="mb-6">
+        <p className="text-tagline text-ink-muted-80 mb-2">Total spent this month</p>
         <CountUp value={totalSpent} currency={currency} className="text-display-lg text-ink" />
       </div>
 

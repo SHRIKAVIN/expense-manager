@@ -5,7 +5,7 @@ import { useScrolled } from "./scroll";
 export function Screen({
   children,
   className,
-  /** Adds top padding. Safe-area top is owned by AppHeader on mobile. */
+  /** Adds top padding below AppHeader on mobile; on desktop uses lg inset or ScreenHeader. */
   topInset = true,
 }: {
   children: ReactNode;
@@ -16,7 +16,8 @@ export function Screen({
     <div
       className={cn(
         "mx-auto w-full max-w-2xl px-5 lg:px-8",
-        topInset && "pt-5 lg:pt-12",
+        // Mobile: gap below AppHeader. Desktop: ScreenHeader or larger inset when topInset.
+        topInset ? "pt-8 lg:pt-12" : "pt-8 lg:pt-0",
         className,
       )}
     >
@@ -41,7 +42,7 @@ export function ScreenHeader({
         // Mobile title lives in AppHeader; keep this for desktop where the rail has no title.
         "hidden lg:block",
         "sticky top-0 z-30 -mx-5 px-5 lg:-mx-8 lg:px-8 mb-6 border-b transition-colors duration-200",
-        "pt-3 pb-3 lg:pt-10",
+        "pt-4 pb-4 lg:pt-10",
         scrolled ? "glass border-hairline" : "border-transparent",
       )}
     >

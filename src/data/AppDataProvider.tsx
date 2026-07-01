@@ -4,12 +4,15 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { createRepository, RolePolicy, type ExpenseRepository } from "./expenseRepository";
+import {
+  readWorkspaceCache,
+  writeWorkspaceCache,
+} from "@/lib/cache/userCache";
 import type {
   Category,
   Expense,
@@ -62,11 +65,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   if (!user) throw new Error("AppDataProvider requires an authenticated user");
 
   const repo = useMemo(() => createRepository(user), [user]);
-  const [ready, setReady] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [recurring, setRecurring] = useState<Recurring[]>([]);
-  const bootstrapped = useRef<string | null>(null);
+  const cachedWorkspace = useMemo(() => readWorkspaceCache(user.id), [user.id]);
+  const [ready, setReady] = useState(() => cachedWorkspace !== null);
+  const [categories, setCategories] = useState<Category[]>(() => cachedWorkspace?.categories ?? []);
+  const [expenses, setExpenses] = useState<Expense[]>(() => cachedWorkspace?.expenses ?? []);
+  const [recurring, setRecurring] = useState<Recurring[]>(() => cachedWorkspace?.recurring ?? []);
 
   const refresh = useCallback(async () => {
     const [cats, exps, recs] = await Promise.all([
@@ -77,25 +80,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     setCategories(cats);
     setExpenses(exps);
     setRecurring(recs);
-  }, [repo]);
+    writeWorkspaceCache(user.id, {
+      categories: cats,
+      expenses: exps,
+      recurring: recs,
+    });
+  }, [repo, user.id]);
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
-      setReady(false);
       await repo.ensureWorkspace();
-      // Materialize any due recurring rules (idempotent, role-checked internally).
       await repo.generateDueRecurring();
       await refresh();
-      if (!cancelled) {
-        bootstrapped.current = user.id;
-        setReady(true);
-      }
+      if (!cancelled) setReady(true);
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [repo, refresh, user.id]);
+  }, [refresh, repo]);
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {

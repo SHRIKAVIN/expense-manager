@@ -79,9 +79,12 @@ export function TransactionsScreen() {
     try {
       exportExpensesPdf(filtered, {
         title: "Expense Manager — Transactions",
-        subtitle: user?.displayName,
         currency,
         categoriesById,
+        user: {
+          name: user?.displayName ?? "User",
+          email: user?.email ?? "",
+        },
         dateRange: { from: dateFrom, to: dateTo },
       });
       show("PDF downloaded");

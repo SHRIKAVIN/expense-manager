@@ -19,25 +19,36 @@ export const APP_NAV = [
   { to: "/settings", label: "Settings", icon: SettingsIcon, end: false as const },
 ];
 
-function routeTitle(pathname: string): string {
-  const item = APP_NAV.find((n) =>
-    n.end ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`),
+function currentRoute(pathname: string) {
+  return (
+    APP_NAV.find((n) =>
+      n.end ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`),
+    ) ?? APP_NAV[0]
   );
-  return item?.label ?? "Expenses";
+}
+
+function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] }) {
+  return (
+    <div
+      className="h-10 w-10 rounded-sm bg-primary text-on-primary flex items-center justify-center shrink-0"
+      aria-hidden
+    >
+      <Icon size={20} strokeWidth={2} />
+    </div>
+  );
 }
 
 export function AppHeader() {
   const { pathname } = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const title = routeTitle(pathname);
+  const route = currentRoute(pathname);
+  const title = route.label;
 
   return (
     <>
-      <header className="lg:hidden shrink-0 z-40 border-b border-hairline glass app-header">
+      <header className="lg:hidden sticky top-0 z-40 shrink-0 border-b border-hairline glass app-header">
         <div className="flex h-[var(--app-header-bar)] items-center gap-3 px-4">
-          <div className="h-8 w-8 rounded-sm bg-primary text-on-primary flex items-center justify-center shrink-0">
-            <WalletIcon size={18} />
-          </div>
+          <PageIconBadge icon={route.icon} />
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>
           <button
             type="button"
