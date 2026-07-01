@@ -38,8 +38,8 @@ export function ExpenseRow({
   };
 
   const rowInner = (
-    <div className="flex items-center gap-3 bg-canvas px-4 py-3">
-      <div className="h-10 w-10 rounded-sm bg-canvas-parchment flex items-center justify-center text-ink shrink-0">
+    <div className="flex items-center gap-3 px-6 py-3">
+      <div className="h-10 w-10 rounded-sm bg-surface-pearl flex items-center justify-center text-ink shrink-0">
         <CategoryGlyph icon={category?.icon ?? "other"} size={20} />
       </div>
 
@@ -122,7 +122,7 @@ export function ExpenseRow({
               if (info.offset.x < -80) onDelete(expense);
               x.set(0);
             }}
-            className="cursor-pointer lg:cursor-default"
+            className="cursor-pointer bg-canvas lg:cursor-default"
           >
             {rowInner}
           </motion.div>

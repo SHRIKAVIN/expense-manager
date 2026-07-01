@@ -10,7 +10,7 @@ import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MonthPicker } from "@/components/MonthPicker";
-import { CategoryDonut } from "@/features/CategoryDonut";
+import { CategoryDonut, categorySliceStyle } from "@/features/CategoryDonut";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
@@ -24,6 +24,7 @@ import {
   AlertIcon,
   CategoryGlyph,
   ListIcon,
+  RefreshIcon,
   RepeatIcon,
 } from "@/lib/icons";
 import type { Expense } from "@/lib/types";
@@ -32,13 +33,14 @@ import { listItemVariants } from "@/lib/motion";
 export function DashboardScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, categories, categoriesById, recurring, removeExpense } = useAppData();
+  const { expenses, categories, categoriesById, recurring, removeExpense, refresh } = useAppData();
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const [refreshing, setRefreshing] = useState(false);
 
   const minMonth = useMemo(() => {
     if (expenses.length === 0) return undefined;
@@ -95,17 +97,34 @@ export function DashboardScreen() {
     setConfirmTarget(null);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Could not refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const isEmpty = expenses.length === 0;
   const monthEmpty = !isEmpty && monthExpenses.length === 0;
 
   return (
     <Screen>
-      <MonthPicker
-        value={selectedMonth}
-        onChange={setSelectedMonth}
-        minMonth={minMonth}
-        className="mb-4"
-      />
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <MonthPicker value={selectedMonth} onChange={setSelectedMonth} minMonth={minMonth} />
+        <Button
+          variant="icon-circular"
+          aria-label="Refresh dashboard"
+          disabled={refreshing}
+          onClick={() => void handleRefresh()}
+          className={refreshing ? "shrink-0 [&_svg]:animate-spin" : "shrink-0"}
+        >
+          <RefreshIcon size={20} />
+        </Button>
+      </div>
       <div className="mb-6">
         <p className="text-tagline text-ink-muted-80 mb-2">Total spent this month</p>
         <CountUp value={totalSpent} currency={currency} className="text-display-lg text-ink" />
@@ -170,8 +189,13 @@ export function DashboardScreen() {
             <p className="text-tagline text-ink mb-4">Spend by category</p>
             <CategoryDonut slices={slices} currency={currency} total={totalSpent} />
             <div className="mt-5 flex flex-col gap-2">
-              {slices.slice(0, 5).map((s) => (
+              {slices.slice(0, 5).map((s, i) => (
                 <div key={s.categoryId} className="flex items-center gap-3">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary-focus"
+                    style={categorySliceStyle(i, slices.length)}
+                    aria-hidden
+                  />
                   <span className="text-ink-muted-80">
                     <CategoryGlyph icon={s.icon} size={18} />
                   </span>
@@ -212,7 +236,7 @@ export function DashboardScreen() {
           )}
 
           {/* Recent transactions */}
-          <Card padded={false}>
+          <Card padded={false} className="overflow-hidden">
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
               <p className="text-tagline text-ink">Recent</p>
             </div>

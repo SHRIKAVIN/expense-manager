@@ -39,7 +39,14 @@ function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] 
   );
 }
 
-export function HomeLogoButton({ className }: { className?: string }) {
+export function HomeLogoButton({
+  className,
+  icon: Icon,
+}: {
+  className?: string;
+  /** Page icon for the header badge; tap still goes to dashboard. */
+  icon: (typeof APP_NAV)[number]["icon"];
+}) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -50,7 +57,7 @@ export function HomeLogoButton({ className }: { className?: string }) {
       onClick={() => goToDashboard(navigate, pathname)}
       className={cn("shrink-0 outline-none", className)}
     >
-      <PageIconBadge icon={HomeIcon} />
+      <PageIconBadge icon={Icon} />
     </button>
   );
 }
@@ -65,7 +72,7 @@ export function AppHeader() {
     <>
       <header className="lg:hidden sticky top-0 z-40 shrink-0 border-b border-hairline glass app-header">
         <div className="flex h-[var(--app-header-bar)] items-center gap-3 px-4">
-          <HomeLogoButton />
+          <HomeLogoButton icon={route.icon} />
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>
           <button
             type="button"

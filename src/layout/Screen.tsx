@@ -17,7 +17,7 @@ export function Screen({
       className={cn(
         "mx-auto w-full max-w-2xl px-5 lg:px-8",
         // Mobile: gap below AppHeader. Desktop: ScreenHeader or larger inset when topInset.
-        topInset ? "pt-8 lg:pt-12" : "pt-8 lg:pt-0",
+        topInset ? "pt-6 lg:pt-12" : "pt-6 lg:pt-0",
         className,
       )}
     >

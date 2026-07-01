@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
+import { HomeIcon } from "@/lib/icons";
 import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { useAppData } from "@/data/AppDataProvider";
@@ -38,7 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Left rail (desktop) */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8">
           <div className="px-3 mb-8 flex items-center gap-2">
-            <HomeLogoButton />
+            <HomeLogoButton icon={HomeIcon} />
             <span className="text-tagline text-ink">Expenses</span>
           </div>
           <nav className="flex flex-col gap-1">
