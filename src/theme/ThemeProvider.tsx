@@ -12,6 +12,19 @@ import type { ResolvedTheme, ThemePreference } from "@/lib/types";
 
 const LAST_RESOLVED_KEY = "em.theme.lastResolved";
 
+function applyResolvedTheme(next: ResolvedTheme) {
+  document.documentElement.setAttribute("data-theme", next);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute(
+    "content",
+    next === "dark" ? "#1d1d1f" : "#ffffff",
+  );
+  try {
+    localStorage.setItem(LAST_RESOLVED_KEY, next);
+  } catch {
+    /* no-op */
+  }
+}
+
 interface ThemeContextValue {
   preference: ThemePreference;
   resolved: ResolvedTheme;
@@ -41,12 +54,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const next = resolve(preference);
     setResolved(next);
-    document.documentElement.setAttribute("data-theme", next);
-    try {
-      localStorage.setItem(LAST_RESOLVED_KEY, next);
-    } catch {
-      /* no-op */
-    }
+    applyResolvedTheme(next);
   }, [preference]);
 
   // Live-update when OS theme changes while in "system" mode (no refresh).
@@ -56,12 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     const onChange = () => {
       const next = mq.matches ? "dark" : "light";
       setResolved(next);
-      document.documentElement.setAttribute("data-theme", next);
-      try {
-        localStorage.setItem(LAST_RESOLVED_KEY, next);
-      } catch {
-        /* no-op */
-      }
+      applyResolvedTheme(next);
     };
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);

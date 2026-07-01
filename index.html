@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
-    <meta name="theme-color" content="#0066cc" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
@@ -21,6 +21,28 @@
               : "light";
           }
           document.documentElement.setAttribute("data-theme", pref);
+          var themeMeta = document.querySelector('meta[name="theme-color"]');
+          if (themeMeta) themeMeta.setAttribute("content", pref === "dark" ? "#1d1d1f" : "#ffffff");
+        } catch (e) {
+          /* no-op */
+        }
+      })();
+    </script>
+    <script>
+      // iOS "Add to Home Screen" does not always match (display-mode: standalone).
+      // Tag <html> early so safe-area fallbacks apply before first paint.
+      (function () {
+        try {
+          var root = document.documentElement;
+          var ua = navigator.userAgent || "";
+          var ios =
+            /iPhone|iPad|iPod/.test(ua) ||
+            (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+          if (ios) root.classList.add("ios");
+          var standalone =
+            window.matchMedia("(display-mode: standalone)").matches ||
+            ("standalone" in navigator && navigator.standalone);
+          if (standalone) root.classList.add("pwa-standalone");
         } catch (e) {
           /* no-op */
         }

@@ -19,7 +19,7 @@ export default defineConfig({
         short_name: "Expenses",
         description: "A production-quality personal expense manager.",
         theme_color: "#0066cc",
-        background_color: "#0066cc",
+        background_color: "#ffffff",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",

@@ -44,18 +44,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ScrolledContext.Provider value={scrolled}>
       {/*
-       * Mobile: `h-dvh` flex column (NOT fixed) — iOS standalone resolves dvh to
-       * the full screen including the home-indicator region, so a flex-child
-       * nav lands at the true bottom. `fixed inset-0` + height APIs leave a gap
-       * below the nav in installed PWAs (Chrome in-browser is fine).
-       *
-       * Desktop: pinned shell with left rail.
+       * Mobile shell fills the screen. Bottom nav is `position: fixed` (see
+       * .bottom-nav in index.css) so it stays on the physical bottom in iOS
+       * standalone — flex-child nav + dvh leaves a gap when env() is 0.
        */}
       <div
         className={cn(
           "bg-canvas text-ink overflow-hidden",
-          "h-dvh max-h-dvh w-full flex flex-col",
-          "lg:fixed lg:inset-0 lg:h-auto lg:max-h-none lg:flex-row",
+          "fixed inset-0 w-full flex flex-col",
+          "lg:flex-row",
         )}
       >
         {/* Left rail (desktop) */}
@@ -80,10 +77,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 6)}
             className={cn(
               "flex-1 min-h-0 overflow-y-auto overflow-x-hidden lg:pb-12",
-              // Reserve room so the floating FAB never sits on top of the last
-              // row — it rests over empty space instead. The nav is a sibling
-              // (not overlapping), so this only needs to clear the FAB.
-              showFab ? "pb-24" : "pb-6",
+              // Fixed bottom nav overlaps scroll content — reserve its height (+ FAB).
+              showFab
+                ? "pb-[calc(var(--bottom-nav-total)+4.25rem)]"
+                : "pb-[calc(var(--bottom-nav-total)+0.75rem)]",
             )}
           >
             {/* Instant content swap with a light fade-in (no exit wait) per §6. */}
@@ -97,9 +94,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </motion.div>
           </main>
 
-          {/* Bottom tab bar — flex child + .bottom-nav safe-area fill for PWA. */}
-          <nav className="lg:hidden shrink-0 z-40 border-t border-hairline glass bottom-nav">
-            <div className="flex h-[3.25rem] items-stretch justify-around">
+          {/* Bottom tab bar — fixed on mobile; .bottom-nav handles safe area. */}
+          <nav className="lg:hidden border-t border-hairline glass bottom-nav">
+            <div className="flex h-[var(--bottom-nav-bar)] items-stretch justify-around">
               {NAV.map((item) => (
                 <TabLink key={item.to} {...item} />
               ))}
