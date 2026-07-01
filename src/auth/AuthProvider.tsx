@@ -7,15 +7,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { db, uid } from "@/data/db";
-import { hashPasscode } from "@/lib/hash";
+import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
+import { ensureProfile } from "@/lib/supabase/ensureProfile";
+import { profileToSession } from "@/lib/supabase/mappers";
 import type { Role, SessionUser, ThemePreference, User } from "@/lib/types";
-
-const SESSION_KEY = "em.session.userId";
 
 interface SignupInput {
   email: string;
-  passcode: string;
+  password: string;
   displayName: string;
   role: Role;
   currency: string;
@@ -24,110 +23,174 @@ interface SignupInput {
 interface AuthContextValue {
   user: SessionUser | null;
   status: "loading" | "authed" | "anon";
+  configError: string | null;
   signup: (input: SignupInput) => Promise<void>;
-  login: (email: string, passcode: string) => Promise<void>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   updateProfile: (patch: Partial<Pick<User, "displayName" | "currency">>) => Promise<void>;
   setThemePreference: (pref: ThemePreference) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function toSession(u: User): SessionUser {
-  const { passHash: _passHash, ...rest } = u;
-  return rest;
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [status, setStatus] = useState<"loading" | "authed" | "anon">("loading");
+  const [configError] = useState<string | null>(() =>
+    isSupabaseEnabled()
+      ? null
+      : "Supabase is not configured. Copy .env.example to .env.local and add your project keys.",
+  );
 
   useEffect(() => {
+    if (!isSupabaseEnabled()) {
+      setStatus("anon");
+      return;
+    }
+
     let cancelled = false;
-    (async () => {
-      const id = localStorage.getItem(SESSION_KEY);
-      if (id) {
-        const u = await db.users.get(id);
-        if (!cancelled && u) {
-          setUser(toSession(u));
-          setStatus("authed");
+    const sb = getSupabase();
+
+    const loadSession = async () => {
+      try {
+        const { data: { user: authUser }, error } = await sb.auth.getUser();
+        if (error) throw error;
+        if (cancelled) return;
+        if (!authUser) {
+          setUser(null);
+          setStatus("anon");
           return;
         }
+        const profile = await ensureProfile(authUser);
+        if (cancelled) return;
+        setUser(profile);
+        setStatus("authed");
+      } catch {
+        if (!cancelled) {
+          setUser(null);
+          setStatus("anon");
+        }
       }
-      if (!cancelled) setStatus("anon");
-    })();
+    };
+
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) void loadSession();
+      else if (!cancelled) setStatus("anon");
+    });
+
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange((_event, session) => {
+      if (session) void loadSession();
+      else {
+        setUser(null);
+        setStatus("anon");
+      }
+    });
+
     return () => {
       cancelled = true;
+      subscription.unsubscribe();
     };
   }, []);
 
   const signup = useCallback(async (input: SignupInput) => {
+    if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
     const email = input.email.trim().toLowerCase();
     if (!email) throw new Error("Email is required.");
-    if (input.passcode.length < 4) throw new Error("Passcode must be at least 4 characters.");
-    const existing = await db.users.where("email").equals(email).first();
-    if (existing) throw new Error("An account with that email already exists.");
+    if (input.password.length < 6) throw new Error("Password must be at least 6 characters.");
 
-    const newUser: User = {
-      id: uid("usr"),
+    const { data, error } = await getSupabase().auth.signUp({
       email,
-      passHash: await hashPasscode(input.passcode),
-      displayName: input.displayName.trim() || email.split("@")[0],
-      role: input.role,
-      currency: input.currency,
-      themePreference: "system",
-      createdAt: Date.now(),
-    };
-    await db.users.add(newUser);
-    localStorage.setItem(SESSION_KEY, newUser.id);
-    setUser(toSession(newUser));
-    setStatus("authed");
-  }, []);
+      password: input.password,
+      options: {
+        data: {
+          display_name: input.displayName.trim() || email.split("@")[0],
+          role: input.role,
+          currency: input.currency,
+        },
+      },
+    });
+    if (error) throw new Error(error.message);
 
-  const login = useCallback(async (emailRaw: string, passcode: string) => {
+    if (data.session && data.user) {
+      const profile = await ensureProfile(data.user);
+      setUser(profile);
+      setStatus("authed");
+      return;
+    }
+
+    throw new Error(
+      "Account created. Check your email to confirm, then sign in.",
+    );
+  }, [configError]);
+
+  const login = useCallback(async (emailRaw: string, password: string) => {
+    if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
     const email = emailRaw.trim().toLowerCase();
-    const u = await db.users.where("email").equals(email).first();
-    if (!u) throw new Error("No account found for that email.");
-    const hash = await hashPasscode(passcode);
-    if (hash !== u.passHash) throw new Error("Incorrect passcode.");
-    localStorage.setItem(SESSION_KEY, u.id);
-    setUser(toSession(u));
-    setStatus("authed");
-  }, []);
+    const { data, error } = await getSupabase().auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error("Sign in failed.");
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
+    const profile = await ensureProfile(data.user);
+    setUser(profile);
+    setStatus("authed");
+  }, [configError]);
+
+  const logout = useCallback(async () => {
+    if (isSupabaseEnabled()) {
+      await getSupabase().auth.signOut();
+    }
     setUser(null);
     setStatus("anon");
   }, []);
 
   const updateProfile = useCallback(
     async (patch: Partial<Pick<User, "displayName" | "currency">>) => {
-      if (!user) return;
-      const u = await db.users.get(user.id);
-      if (!u) return;
-      const next = { ...u, ...patch };
-      await db.users.put(next);
-      setUser(toSession(next));
+      if (!user || !isSupabaseEnabled()) return;
+      const updates: Record<string, string> = {};
+      if (patch.displayName !== undefined) updates.display_name = patch.displayName.trim();
+      if (patch.currency !== undefined) updates.currency = patch.currency;
+
+      const { data, error } = await getSupabase()
+        .from("profiles")
+        .update(updates)
+        .eq("id", user.id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      setUser(profileToSession(data));
     },
     [user],
   );
 
   const setThemePreference = useCallback(
     async (pref: ThemePreference) => {
-      if (!user) return;
-      const u = await db.users.get(user.id);
-      if (!u) return;
-      const next = { ...u, themePreference: pref };
-      await db.users.put(next);
-      setUser(toSession(next));
+      if (!user || !isSupabaseEnabled()) return;
+      const { data, error } = await getSupabase()
+        .from("profiles")
+        .update({ theme_preference: pref })
+        .eq("id", user.id)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      setUser(profileToSession(data));
     },
     [user],
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, signup, login, logout, updateProfile, setThemePreference }),
-    [user, status, signup, login, logout, updateProfile, setThemePreference],
+    () => ({
+      user,
+      status,
+      configError,
+      signup,
+      login,
+      logout,
+      updateProfile,
+      setThemePreference,
+    }),
+    [user, status, configError, signup, login, logout, updateProfile, setThemePreference],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

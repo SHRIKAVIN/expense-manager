@@ -58,7 +58,27 @@ export function monthKey(iso: string): string {
 }
 
 export function currentMonthKey(): string {
-  return new Date().toISOString().slice(0, 7);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Shift a yyyy-mm key by `delta` months (negative = past). */
+export function shiftMonthKey(key: string, delta: number): string {
+  const [y, m] = key.split("-").map(Number);
+  const d = new Date(y, (m ?? 1) - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Inclusive list of yyyy-mm keys from `from` through `to`, newest first. */
+export function listMonthKeys(from: string, to: string): string[] {
+  const keys: string[] = [];
+  let cur = to;
+  for (;;) {
+    keys.push(cur);
+    if (cur === from) break;
+    cur = shiftMonthKey(cur, -1);
+  }
+  return keys;
 }
 
 export function monthLabel(key: string): string {

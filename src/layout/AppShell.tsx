@@ -44,18 +44,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <ScrolledContext.Provider value={scrolled}>
       {/*
-       * Pin the shell with `fixed inset-0` so it anchors to BOTH the real top
-       * and bottom edges of the viewport. On iOS standalone PWAs every
-       * height-based approach (100dvh / 100vh / JS innerHeight) oscillates after
-       * the app is backgrounded, so anchoring both edges is the only reliable
-       * way to keep the shell exactly screen-sized.
+       * Mobile: `h-dvh` flex column (NOT fixed) — iOS standalone resolves dvh to
+       * the full screen including the home-indicator region, so a flex-child
+       * nav lands at the true bottom. `fixed inset-0` + height APIs leave a gap
+       * below the nav in installed PWAs (Chrome in-browser is fine).
        *
-       * Critically, the bottom nav below is a normal flex child (NOT
-       * absolute/fixed bottom-0): iOS lays `fixed/absolute bottom-0` against the
-       * "large" launch viewport, dropping the bar above its real spot until a
-       * scroll forces a reflow. Flow layout inside this fixed box avoids that.
+       * Desktop: pinned shell with left rail.
        */}
-      <div className="fixed inset-0 bg-canvas text-ink flex flex-col lg:flex-row">
+      <div
+        className={cn(
+          "bg-canvas text-ink overflow-hidden",
+          "h-dvh max-h-dvh w-full flex flex-col",
+          "lg:fixed lg:inset-0 lg:h-auto lg:max-h-none lg:flex-row",
+        )}
+      >
         {/* Left rail (desktop) */}
         <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8">
           <div className="px-3 mb-8 flex items-center gap-2">
@@ -71,9 +73,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           </nav>
         </aside>
 
-        {/* Content column: a flex column so the nav sits in normal flow at the
-            real bottom. `relative` anchors the floating FAB. */}
-        <div className="relative flex-1 min-w-0 h-full flex flex-col">
+        {/* Content column: flex column pushes nav to the physical bottom on iOS. */}
+        <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">
           <main
             ref={scrollRef}
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 6)}
@@ -96,10 +97,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </motion.div>
           </main>
 
-          {/* Bottom tab bar (mobile) — a normal flex child (shrink-0) in flow so
-              iOS pushes it to the true screen bottom without a reflow glitch. */}
-          <nav className="lg:hidden shrink-0 z-40 border-t border-hairline glass pb-[max(calc(env(safe-area-inset-bottom)_-_0.625rem),0.375rem)]">
-            <div className="flex items-stretch justify-around">
+          {/* Bottom tab bar — flex child + .bottom-nav safe-area fill for PWA. */}
+          <nav className="lg:hidden shrink-0 z-40 border-t border-hairline glass bottom-nav">
+            <div className="flex h-[3.25rem] items-stretch justify-around">
               {NAV.map((item) => (
                 <TabLink key={item.to} {...item} />
               ))}
@@ -164,7 +164,7 @@ function TabLink({
       end={end}
       className={({ isActive }) =>
         cn(
-          "flex-1 flex flex-col items-center gap-0.5 pt-2 pb-1 outline-none",
+          "flex-1 flex flex-col items-center gap-0.5 justify-center outline-none",
           isActive ? "text-primary" : "text-ink-muted-48",
         )
       }

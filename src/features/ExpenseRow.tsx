@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { CategoryGlyph, EditIcon, TrashIcon } from "@/lib/icons";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { useAppData } from "@/data/AppDataProvider";
 import type { Category, Expense } from "@/lib/types";
 import { usePrefersReducedMotion } from "@/lib/motion";
@@ -13,9 +13,18 @@ interface ExpenseRowProps {
   currency: string;
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
+  /** Show the expense date below the category line (e.g. on Dashboard recents). */
+  showDate?: boolean;
 }
 
-export function ExpenseRow({ expense, category, currency, onEdit, onDelete }: ExpenseRowProps) {
+export function ExpenseRow({
+  expense,
+  category,
+  currency,
+  onEdit,
+  onDelete,
+  showDate,
+}: ExpenseRowProps) {
   const { can, repo } = useAppData();
   const reduced = usePrefersReducedMotion();
   const x = useMotionValue(0);
@@ -55,6 +64,9 @@ export function ExpenseRow({ expense, category, currency, onEdit, onDelete }: Ex
           {expense.paymentMethod ? ` · ${expense.paymentMethod}` : ""}
           {expense.recurringId ? " · recurring" : ""}
         </p>
+        {showDate && (
+          <p className="text-fine-print text-ink-muted-48 mt-0.5">{formatDate(expense.date)}</p>
+        )}
       </div>
 
       <span className="text-body-strong text-ink tabular-nums shrink-0">

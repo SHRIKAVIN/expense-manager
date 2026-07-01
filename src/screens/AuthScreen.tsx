@@ -15,11 +15,11 @@ const ROLES: { value: Role; label: string; blurb: string }[] = [
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "SGD"];
 
 export function AuthScreen() {
-  const { login, signup } = useAuth();
+  const { login, signup, configError } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
-  const [passcode, setPasscode] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Owner");
   const [currency, setCurrency] = useState("INR");
   const [error, setError] = useState<string | null>(null);
@@ -30,9 +30,9 @@ export function AuthScreen() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        await signup({ email, passcode, displayName, role, currency });
+        await signup({ email, password, displayName, role, currency });
       } else {
-        await login(email, passcode);
+        await login(email, password);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -41,10 +41,22 @@ export function AuthScreen() {
     }
   };
 
+  if (configError) {
+    return (
+      <div className="h-full overflow-y-auto bg-canvas flex items-center justify-center px-5">
+        <div className="max-w-md text-center">
+          <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mx-auto mb-5">
+            <WalletIcon size={28} />
+          </div>
+          <h1 className="text-tagline text-ink mb-2">Setup required</h1>
+          <p className="text-body text-ink-muted-48">{configError}</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-y-auto bg-canvas">
-      {/* Inner min-h-full wrapper centers the card when it fits and lets the
-          top scroll into view when the form is taller than the viewport. */}
       <div className="min-h-full flex items-center justify-center px-5 pt-[calc(env(safe-area-inset-top)+2rem)] pb-[calc(env(safe-area-inset-bottom)+2rem)]">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center text-center mb-8">
@@ -53,7 +65,7 @@ export function AuthScreen() {
           </div>
           <h1 className="text-display-md text-ink">Expense Manager</h1>
           <p className="text-lead-airy text-ink-muted-48 mt-2">
-            {mode === "signup" ? "Create your private workspace." : "Welcome back."}
+            {mode === "signup" ? "Create your cloud account." : "Welcome back."}
           </p>
         </div>
 
@@ -75,11 +87,12 @@ export function AuthScreen() {
             onChange={(e) => setEmail(e.target.value)}
           />
           <TextField
-            label="Passcode"
+            label="Password"
             type="password"
-            placeholder="At least 4 characters"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+            placeholder="At least 6 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
           />
 
           {mode === "signup" && (

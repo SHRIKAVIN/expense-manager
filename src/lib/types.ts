@@ -7,8 +7,6 @@ export type ResolvedTheme = "light" | "dark";
 export interface User {
   id: string;
   email: string;
-  /** Passcode hash (local-only auth, not real security). */
-  passHash: string;
   displayName: string;
   role: Role;
   currency: string;
@@ -16,8 +14,8 @@ export interface User {
   createdAt: number;
 }
 
-/** Public-facing session user (no secrets). */
-export type SessionUser = Omit<User, "passHash">;
+/** Public-facing session user. */
+export type SessionUser = User;
 
 export type RecurringFrequency = "weekly" | "monthly" | "yearly";
 

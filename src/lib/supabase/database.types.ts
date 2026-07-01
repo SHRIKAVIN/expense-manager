@@ -1,0 +1,59 @@
+export type DbRole = "Owner" | "Member" | "Viewer";
+export type DbThemePreference = "light" | "dark" | "system";
+export type DbRecurringFrequency = "weekly" | "monthly" | "yearly";
+
+export interface DbProfile {
+  id: string;
+  email: string;
+  display_name: string;
+  role: DbRole;
+  currency: string;
+  theme_preference: DbThemePreference;
+  created_at: string;
+}
+
+export interface DbCategory {
+  id: string;
+  user_id: string;
+  name: string;
+  icon: string;
+  monthly_budget: number | null;
+  archived: boolean;
+  created_at: string;
+}
+
+export interface DbExpense {
+  id: string;
+  user_id: string;
+  amount: number;
+  merchant: string;
+  category_id: string;
+  date: string;
+  payment_method: string | null;
+  notes: string | null;
+  receipt_id: string | null;
+  recurring_id: string | null;
+  recurring_period: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbReceipt {
+  id: string;
+  user_id: string;
+  data_url: string;
+  created_at: string;
+}
+
+export interface DbRecurring {
+  id: string;
+  user_id: string;
+  amount: number;
+  merchant: string;
+  category_id: string;
+  frequency: DbRecurringFrequency;
+  next_due: string;
+  payment_method: string | null;
+  notes: string | null;
+  created_at: string;
+}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Screen, ScreenHeader } from "@/layout/Screen";
 import { Card } from "@/components/Card";
+import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { Chip } from "@/components/Chip";
 import { EmptyState } from "@/components/EmptyState";
@@ -12,10 +13,23 @@ import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { groupByDay } from "@/lib/analytics";
-import { formatDayHeading } from "@/lib/format";
-import { CategoryGlyph, ListIcon, SearchIcon } from "@/lib/icons";
+import { exportExpensesPdf } from "@/lib/exportPdf";
+import { formatDayHeading, todayISO } from "@/lib/format";
+import {
+  CategoryGlyph,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  DownloadIcon,
+  ListIcon,
+  SearchIcon,
+} from "@/lib/icons";
 import type { Expense } from "@/lib/types";
 import { listItemVariants } from "@/lib/motion";
+
+function firstDayOfMonth(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
 
 export function TransactionsScreen() {
   const { user } = useAuth();
@@ -25,6 +39,9 @@ export function TransactionsScreen() {
 
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState(firstDayOfMonth());
+  const [dateTo, setDateTo] = useState(todayISO());
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
 
@@ -33,6 +50,7 @@ export function TransactionsScreen() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return expenses.filter((e) => {
+      if (e.date < dateFrom || e.date > dateTo) return false;
       if (activeCat && e.categoryId !== activeCat) return false;
       if (!q) return true;
       return (
@@ -42,7 +60,7 @@ export function TransactionsScreen() {
         (categoriesById[e.categoryId]?.name ?? "").toLowerCase().includes(q)
       );
     });
-  }, [expenses, search, activeCat, categoriesById]);
+  }, [expenses, search, activeCat, categoriesById, dateFrom, dateTo]);
 
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
 
@@ -51,6 +69,25 @@ export function TransactionsScreen() {
     await removeExpense(confirmTarget.id);
     show("Expense deleted");
     setConfirmTarget(null);
+  };
+
+  const exportPdf = () => {
+    if (filtered.length === 0) {
+      show("Nothing to export for this filter");
+      return;
+    }
+    try {
+      exportExpensesPdf(filtered, {
+        title: "Expense Manager — Transactions",
+        subtitle: user?.displayName,
+        currency,
+        categoriesById,
+        dateRange: { from: dateFrom, to: dateTo },
+      });
+      show("PDF downloaded");
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Export failed");
+    }
   };
 
   return (
@@ -80,6 +117,60 @@ export function TransactionsScreen() {
             </Chip>
           ))}
         </div>
+
+        {/* Collapsible date-range filter + PDF export */}
+        <Card padded={false} className="overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className="w-full flex items-center justify-between px-5 py-3.5 outline-none"
+            aria-expanded={filtersOpen}
+          >
+            <span className="text-body-strong text-ink">Filter and Export</span>
+            {filtersOpen ? (
+              <ChevronUpIcon size={20} className="text-ink-muted-48" />
+            ) : (
+              <ChevronDownIcon size={20} className="text-ink-muted-48" />
+            )}
+          </button>
+
+          <AnimatePresence initial={false}>
+            {filtersOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
+              >
+                <div className="px-5 pb-5 pt-1 flex flex-col gap-4 border-t border-divider-soft">
+                  <div className="grid grid-cols-2 gap-3">
+                    <TextField
+                      label="From"
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                    />
+                    <TextField
+                      label="To"
+                      type="date"
+                      value={dateTo}
+                      min={dateFrom}
+                      onChange={(e) => setDateTo(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-caption text-ink-muted-48">
+                    Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"} in
+                    this range
+                  </p>
+                  <Button variant="secondary" fullWidth onClick={exportPdf}>
+                    <DownloadIcon size={18} /> Download PDF
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Card>
       </div>
 
       {filtered.length === 0 ? (
@@ -90,7 +181,7 @@ export function TransactionsScreen() {
             subcopy={
               expenses.length === 0
                 ? "Tap the + button to record your first expense."
-                : "Try a different search or category filter."
+                : "Try a different search, category, or date range."
             }
           />
         </Card>

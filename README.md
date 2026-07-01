@@ -4,8 +4,8 @@ A production-quality **Expense Manager Progressive Web App** built with **React 
 
 ## Highlights
 
+- **Cloud sync** — Supabase Auth + Postgres with row-level security; each user's data is isolated in the cloud.
 - **Installable PWA** — manifest + service worker, offline-capable shell (`vite-plugin-pwa`).
-- **Per-user isolation** — each account is a fresh, empty workspace stored in IndexedDB, namespaced by user id. No shared seed/demo data.
 - **Role-based access** — `Owner` / `Member` / `Viewer`, enforced in both the UI and the repository layer.
 - **Light / Dark / System** themes, persisted per-user, with live OS-theme updates and no flash on load.
 - **Single accent color** (Action Blue) across the entire app — no second hue.
@@ -20,8 +20,25 @@ A production-quality **Expense Manager Progressive Web App** built with **React 
 | Styling | Tailwind CSS (tokens in `src/styles/tokens.css`) |
 | Motion | Framer Motion |
 | Charts | Recharts |
-| Persistence | IndexedDB via Dexie, behind `src/data/expenseRepository.ts` |
+| Persistence | Supabase (Postgres + Auth). IndexedDB fallback when env vars are absent. |
+| Auth | Supabase Auth (email + password) |
 | PWA | `vite-plugin-pwa` |
+
+## Supabase setup
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. In **Project Settings → API**, copy the **Project URL** and **anon public** key.
+3. Copy `.env.example` to `.env.local` and paste your keys:
+
+```bash
+cp .env.example .env.local
+```
+
+4. Open **SQL Editor** in Supabase and run the full contents of `supabase/schema.sql`.
+5. In **Authentication → Providers → Email**, disable **Confirm email** for local dev (optional — otherwise users must confirm before sign-in).
+6. Restart the dev server: `npm run dev`.
+
+Each signed-up user gets a `profiles` row (via database trigger) and their own categories, expenses, receipts, and recurring rules — protected by Row Level Security.
 
 ## Getting started
 
@@ -33,16 +50,14 @@ npm run preview    # preview the production build (test PWA/offline)
 npm run typecheck  # tsc --noEmit
 npm run icons      # regenerate PWA icons from scripts/generate-icons.mjs
 ```
-
-> Auth is **local-only** for v1 (email + passcode hashed with SHA-256). It is not real security — it exists to namespace per-user workspaces and demonstrate role gating.
-
 ## Project structure
 
 ```
 src/
   styles/        tokens.css (single source of color truth) + global styles
   lib/           types, formatting, analytics, motion, icons, helpers
-  data/          Dexie db, defaults, role-gated repository, AppDataProvider
+  data/          Supabase + local repositories, AppDataProvider
+  lib/supabase/  Supabase client, types, mappers
   auth/          local AuthProvider (signup/login/session)
   theme/         ThemeProvider (light/dark/system, per-user)
   components/    design-system component library (§4)

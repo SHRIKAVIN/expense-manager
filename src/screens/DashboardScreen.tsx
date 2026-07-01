@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut } from "@/features/CategoryDonut";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
@@ -37,17 +38,32 @@ export function DashboardScreen() {
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+
+  const minMonth = useMemo(() => {
+    if (expenses.length === 0) return undefined;
+    return expenses.reduce(
+      (min, e) => (e.date.slice(0, 7) < min ? e.date.slice(0, 7) : min),
+      currentMonthKey(),
+    );
+  }, [expenses]);
 
   const monthExpenses = useMemo(
-    () => filterByMonth(expenses, currentMonthKey()),
-    [expenses],
+    () => filterByMonth(expenses, selectedMonth),
+    [expenses, selectedMonth],
   );
   const totalSpent = useMemo(() => sum(monthExpenses), [monthExpenses]);
   const slices = useMemo(
     () => spendByCategory(monthExpenses, categoriesById),
     [monthExpenses, categoriesById],
   );
-  const recent = useMemo(() => expenses.slice(0, 5), [expenses]);
+  const recent = useMemo(
+    () =>
+      [...monthExpenses]
+        .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt)
+        .slice(0, 5),
+    [monthExpenses],
+  );
 
   const budgeted = useMemo(
     () => categories.filter((c) => !c.archived && c.monthlyBudget && c.monthlyBudget > 0),
@@ -80,10 +96,16 @@ export function DashboardScreen() {
   };
 
   const isEmpty = expenses.length === 0;
+  const monthEmpty = !isEmpty && monthExpenses.length === 0;
 
   return (
     <Screen>
-      <p className="text-body text-ink-muted-48">{monthLabel(currentMonthKey())}</p>
+      <MonthPicker
+        value={selectedMonth}
+        onChange={setSelectedMonth}
+        minMonth={minMonth}
+        className="mb-1"
+      />
       <div className="mb-2">
         <p className="text-tagline text-ink-muted-80 mb-1">Total spent this month</p>
         <CountUp value={totalSpent} currency={currency} className="text-display-lg text-ink" />
@@ -131,6 +153,14 @@ export function DashboardScreen() {
             icon={<ListIcon size={48} />}
             headline="Your workspace is ready"
             subcopy="Add your first expense to see your spending come to life here."
+          />
+        </Card>
+      ) : monthEmpty ? (
+        <Card className="mt-6">
+          <EmptyState
+            icon={<ListIcon size={48} />}
+            headline="No spending this month"
+            subcopy={`Nothing recorded in ${monthLabel(selectedMonth)}.`}
           />
         </Card>
       ) : (
@@ -195,6 +225,7 @@ export function DashboardScreen() {
                   currency={currency}
                   onEdit={setEditing}
                   onDelete={(e) => setConfirmTarget(e)}
+                  showDate
                 />
               ))}
             </div>

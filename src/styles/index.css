@@ -15,24 +15,28 @@
     color-scheme: dark;
   }
 
-  html,
-  body,
   #root {
     height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
-  /* Lock the document to the viewport. The app shell is `position: fixed;
-   * inset: 0`, so nothing should scroll or rubber-band at the document level —
-   * that document-level drag is what let the bottom nav be pulled around on
-   * iOS. All scrolling happens inside the shell's <main> instead. */
   html,
   body {
+    height: 100%;
+    min-height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
   }
 
+  /* Lock the document — all scrolling happens inside the app shell <main>. */
+
   body {
     margin: 0;
+    /* Hex fallback — iOS standalone can fail to parse CSS-var-only backgrounds,
+       leaving a visible strip below the nav in the home-indicator zone. */
+    background-color: #ffffff;
     background-color: var(--color-canvas);
     color: var(--color-ink);
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
@@ -47,6 +51,10 @@
     overscroll-behavior-y: none;
     /* Theme cross-fade per §6 */
     transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  [data-theme="dark"] body {
+    background-color: #1d1d1f;
   }
 
   /* Honour the notch on the sides too (landscape / edge-to-edge). */
@@ -111,5 +119,30 @@
 @supports (background: color-mix(in srgb, red, blue)) {
   .glass {
     background-color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
+  }
+}
+
+/* Bottom tab bar — extend background through the home-indicator band. */
+:root {
+  --bottom-nav-total: calc(3.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/*
+ * In iOS standalone PWAs the layout viewport often excludes the home-indicator
+ * area and env(safe-area-inset-bottom) returns 0, which leaves the nav
+ * "hanging" above a blank strip. A defensive floor fills that band; Chrome
+ * (browser mode) keeps the env() value when non-zero.
+ */
+@media (display-mode: standalone) {
+  :root {
+    --bottom-nav-total: calc(3.25rem + max(env(safe-area-inset-bottom, 0px), 34px));
+  }
+
+  .bottom-nav {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 34px);
   }
 }
