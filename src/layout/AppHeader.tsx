@@ -79,9 +79,9 @@ export function AppHeader() {
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(true)}
-            className="h-10 w-10 -mr-2 flex items-center justify-center rounded-md text-ink outline-none"
+            className="h-10 w-12 -mr-2 flex items-center justify-center rounded-md text-ink outline-none"
           >
-            <MenuIcon size={22} />
+            <MenuIcon size={24} strokeWidth={2.1} />
           </button>
         </div>
       </header>

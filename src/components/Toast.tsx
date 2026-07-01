@@ -22,6 +22,16 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+const DISMISS_DISTANCE = 44;
+const DISMISS_VELOCITY = 320;
+
+function shouldDismissToast(offset: { x: number; y: number }, velocity: { x: number; y: number }) {
+  return (
+    Math.hypot(offset.x, offset.y) > DISMISS_DISTANCE ||
+    Math.hypot(velocity.x, velocity.y) > DISMISS_VELOCITY
+  );
+}
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(0);
@@ -54,14 +64,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 layout
                 initial={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={reduced ? { opacity: 0 } : { opacity: 0, y: 16 }}
-                drag={reduced ? false : "x"}
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.6}
+                exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+                drag={reduced ? false : true}
+                dragElastic={0.55}
                 onDragEnd={(_, info) => {
-                  if (Math.abs(info.offset.x) > 80) dismiss(t.id);
+                  if (shouldDismissToast(info.offset, info.velocity)) dismiss(t.id);
                 }}
-                className="pointer-events-auto rounded-lg border border-hairline bg-canvas-parchment px-4 py-3 text-body text-ink min-w-[220px] text-center"
+                className="pointer-events-auto rounded-lg border border-hairline bg-canvas-parchment px-4 py-3 text-body text-ink min-w-[220px] text-center cursor-grab active:cursor-grabbing"
               >
                 {t.message}
               </motion.div>

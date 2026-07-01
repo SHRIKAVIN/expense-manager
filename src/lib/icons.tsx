@@ -52,7 +52,7 @@ export const CloseIcon = (p: IconProps) => (
 
 export const MenuIcon = (p: IconProps) => (
   <svg {...base(p)}>
-    <path d="M4 7h16M4 12h16M4 17h16" />
+    <path d="M3 7h18M3 12h18M3 17h18" />
   </svg>
 );
 
