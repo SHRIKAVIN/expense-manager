@@ -2,7 +2,7 @@
 <html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon-light.svg" data-app-favicon />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#ffffff" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -26,13 +26,13 @@
           document.documentElement.setAttribute("data-theme", pref);
           var themeMeta = document.querySelector('meta[name="theme-color"]');
           if (themeMeta) themeMeta.setAttribute("content", pref === "dark" ? "#1d1d1f" : "#ffffff");
+          var iconPath =
+            pref === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png";
+          var faviconPath = pref === "dark" ? "/favicon-dark.svg" : "/favicon-light.svg";
           var appIcon = document.querySelector('link[rel="apple-touch-icon"][data-app-icon]');
-          if (appIcon) {
-            appIcon.setAttribute(
-              "href",
-              pref === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png",
-            );
-          }
+          if (appIcon) appIcon.setAttribute("href", iconPath);
+          var appFavicon = document.querySelector('link[rel="icon"][data-app-favicon]');
+          if (appFavicon) appFavicon.setAttribute("href", faviconPath);
         } catch (e) {
           /* no-op */
         }

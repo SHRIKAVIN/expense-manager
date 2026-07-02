@@ -3,7 +3,7 @@ import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { Chip } from "@/components/Chip";
 import { useAuth } from "@/auth/AuthProvider";
-import { WalletIcon } from "@/lib/icons";
+import { AppLogoMark } from "@/components/AppLogoMark";
 import type { Role } from "@/lib/types";
 
 const ROLES: { value: Role; label: string; blurb: string }[] = [
@@ -48,9 +48,7 @@ export function AuthScreen() {
       <div className="auth-screen">
         <div className="auth-screen-inner flex min-h-full items-center justify-center text-center">
           <div className="max-w-md">
-            <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mx-auto mb-5">
-              <WalletIcon size={28} />
-            </div>
+            <AppLogoMark size={56} className="mx-auto mb-5" />
             <h1 className="text-tagline text-ink mb-2">Setup required</h1>
             <p className="text-body text-ink-muted-48">{configError}</p>
           </div>
@@ -64,9 +62,7 @@ export function AuthScreen() {
       <div className="auth-screen-inner">
         <div className="w-full max-w-md mx-auto">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="h-14 w-14 rounded-md bg-primary text-on-primary flex items-center justify-center mb-5">
-            <WalletIcon size={28} />
-          </div>
+          <AppLogoMark size={56} className="mb-5" />
           <h1 className="text-display-md text-ink">Expense Manager</h1>
           <p className="text-lead-airy text-ink-muted-48 mt-2">
             {mode === "signup" ? "Create your cloud account." : "Welcome back."}

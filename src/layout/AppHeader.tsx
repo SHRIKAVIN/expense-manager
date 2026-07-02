@@ -12,6 +12,7 @@ import {
   WalletIcon,
 } from "@/lib/icons";
 import { Sheet } from "@/components/Sheet";
+import { IconBadge3D } from "@/components/EmbossedIcon";
 
 export const APP_NAV = [
   { to: "/", label: "Dashboard", icon: HomeIcon, end: true as const },
@@ -31,14 +32,7 @@ function currentRoute(pathname: string) {
 }
 
 function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] }) {
-  return (
-    <div
-      className="h-10 w-10 rounded-sm bg-primary text-on-primary flex items-center justify-center shrink-0"
-      aria-hidden
-    >
-      <Icon size={20} strokeWidth={2} />
-    </div>
-  );
+  return <IconBadge3D icon={Icon} size="md" />;
 }
 
 export function HomeLogoButton({
@@ -109,7 +103,13 @@ export function AppHeader() {
             >
               {({ isActive }) => (
                 <>
-                  <Icon size={22} strokeWidth={isActive ? 2.1 : 1.8} />
+                  {isActive ? (
+                    <IconBadge3D icon={Icon} size="sm" />
+                  ) : (
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-muted-80">
+                      <Icon size={20} strokeWidth={1.8} />
+                    </span>
+                  )}
                   <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>
                 </>
               )}

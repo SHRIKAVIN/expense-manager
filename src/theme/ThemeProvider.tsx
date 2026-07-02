@@ -18,12 +18,14 @@ function applyResolvedTheme(next: ResolvedTheme) {
     "content",
     next === "dark" ? "#1d1d1f" : "#ffffff",
   );
+  const iconPath = next === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png";
+  const faviconPath = next === "dark" ? "/favicon-dark.svg" : "/favicon-light.svg";
   document
     .querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"][data-app-icon]')
-    ?.setAttribute(
-      "href",
-      next === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png",
-    );
+    ?.setAttribute("href", iconPath);
+  document
+    .querySelector<HTMLLinkElement>('link[rel="icon"][data-app-favicon]')
+    ?.setAttribute("href", faviconPath);
   try {
     localStorage.setItem(LAST_RESOLVED_KEY, next);
   } catch {

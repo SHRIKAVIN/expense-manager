@@ -21,16 +21,14 @@ const DevScreen = lazy(() =>
 );
 import { PartnerNotificationListener } from "@/features/PartnerNotificationListener";
 import { BudgetAlerts } from "@/features/BudgetAlerts";
+import { AppLogoMark } from "@/components/AppLogoMark";
 import { notify } from "@/lib/notifications";
 import { daysUntil, relativeDue } from "@/lib/format";
-import { WalletIcon } from "@/lib/icons";
 
 function Splash() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas">
-      <div className="h-12 w-12 rounded-md bg-primary text-on-primary flex items-center justify-center animate-pulse">
-        <WalletIcon size={24} />
-      </div>
+      <AppLogoMark size={48} className="animate-pulse" />
     </div>
   );
 }

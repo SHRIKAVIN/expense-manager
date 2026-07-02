@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
-import { PlusIcon } from "@/lib/icons";
 
 interface FabProps {
   onClick: () => void;
@@ -8,10 +7,32 @@ interface FabProps {
   "data-testid"?: string;
 }
 
-/**
- * Floating Add-Expense FAB: 56px circular, Action Blue, the single drop-shadow (§1.3).
- */
-export function Fab({ onClick, label = "Add expense", "data-testid": testId = "fab-add-expense" }: FabProps) {
+function PlusIcon3D({ size = 26 }: { size?: number }) {
+  const stroke = 2.75;
+  const d = "M12 5v14M5 12h14";
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden className="relative z-[1]">
+      <g strokeLinecap="round" fill="none">
+        <g stroke="rgba(0,0,0,0.34)" strokeWidth={stroke} transform="translate(0 0.85)">
+          <path d={d} />
+        </g>
+        <g stroke="rgba(255,255,255,0.42)" strokeWidth={stroke} transform="translate(0 -0.45)">
+          <path d={d} />
+        </g>
+        <g stroke="#ffffff" strokeWidth={stroke}>
+          <path d={d} />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+/** Floating add button — 3D elevated tile with embossed plus (expense / income). */
+export function Fab({
+  onClick,
+  label = "Add expense",
+  "data-testid": testId = "fab-add-expense",
+}: FabProps) {
   const reduced = usePrefersReducedMotion();
   return (
     <motion.button
@@ -21,9 +42,9 @@ export function Fab({ onClick, label = "Add expense", "data-testid": testId = "f
       data-testid={testId}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
-      className="absolute z-40 right-5 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 h-14 w-14 rounded-full bg-primary text-on-primary shadow-product flex items-center justify-center outline-none"
+      className="fab-3d absolute z-40 right-5 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 flex h-14 w-14 items-center justify-center rounded-full text-on-primary outline-none"
     >
-      <PlusIcon size={26} />
+      <PlusIcon3D size={26} />
     </motion.button>
   );
 }

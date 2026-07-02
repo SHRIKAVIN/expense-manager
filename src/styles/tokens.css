@@ -19,6 +19,10 @@
   --color-surface-black: #000000; /* top nav bar only */
   --color-on-primary: #ffffff;
   --color-chip-translucent: rgba(210, 210, 215, 0.64);
+  --logo-tile-top: #0078e8;
+  --logo-tile-bottom: #0055aa;
+  --fab-tile-top: #0078e8;
+  --fab-tile-bottom: #0055aa;
 }
 
 [data-theme="dark"] {
@@ -35,4 +39,8 @@
   --color-surface-black: #000000;
   --color-on-primary: #ffffff;
   --color-chip-translucent: rgba(72, 72, 74, 0.64);
+  --logo-tile-top: #2c2c2e;
+  --logo-tile-bottom: #121214;
+  --fab-tile-top: #1a8cff;
+  --fab-tile-bottom: #004d99;
 }
