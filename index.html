@@ -8,7 +8,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Expenses" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-light.png" media="(prefers-color-scheme: light)" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-dark.png" media="(prefers-color-scheme: dark)" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-light.png" data-app-icon />
     <title>Expense Manager</title>
     <script>
       // Persist theme before first paint to avoid a flash of the wrong theme (§5.5).
@@ -24,6 +26,13 @@
           document.documentElement.setAttribute("data-theme", pref);
           var themeMeta = document.querySelector('meta[name="theme-color"]');
           if (themeMeta) themeMeta.setAttribute("content", pref === "dark" ? "#1d1d1f" : "#ffffff");
+          var appIcon = document.querySelector('link[rel="apple-touch-icon"][data-app-icon]');
+          if (appIcon) {
+            appIcon.setAttribute(
+              "href",
+              pref === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png",
+            );
+          }
         } catch (e) {
           /* no-op */
         }

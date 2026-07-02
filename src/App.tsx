@@ -27,7 +27,7 @@ import { WalletIcon } from "@/lib/icons";
 
 function Splash() {
   return (
-    <div className="min-h-[60dvh] flex items-center justify-center bg-canvas">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-canvas">
       <div className="h-12 w-12 rounded-md bg-primary text-on-primary flex items-center justify-center animate-pulse">
         <WalletIcon size={24} />
       </div>

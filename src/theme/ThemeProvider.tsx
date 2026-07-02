@@ -18,6 +18,12 @@ function applyResolvedTheme(next: ResolvedTheme) {
     "content",
     next === "dark" ? "#1d1d1f" : "#ffffff",
   );
+  document
+    .querySelector<HTMLLinkElement>('link[rel="apple-touch-icon"][data-app-icon]')
+    ?.setAttribute(
+      "href",
+      next === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png",
+    );
   try {
     localStorage.setItem(LAST_RESOLVED_KEY, next);
   } catch {
