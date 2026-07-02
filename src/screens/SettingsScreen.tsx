@@ -145,11 +145,16 @@ export function SettingsScreen() {
         if (webPushSupported()) {
           try {
             await registerWebPushSubscription(user.id);
-            setPushRegistered(true);
-            show("Partner alerts on — background push enabled");
-          } catch {
+            const registered = await hasPushSubscription(user.id);
+            setPushRegistered(registered);
+            show(
+              registered
+                ? "Partner alerts on — background push enabled"
+                : "Partner alerts on — saved locally, retry Test background push",
+            );
+          } catch (err) {
             setPushRegistered(false);
-            show("Partner alerts on — open app once to finish push setup");
+            show(err instanceof Error ? err.message : "Could not register for background push");
           }
         } else {
           show(vapidConfigured() ? "Partner alerts on" : "Partner alerts on — add VAPID keys for background push");
@@ -170,8 +175,13 @@ export function SettingsScreen() {
     setTestingPush(true);
     try {
       if (webPushSupported() && Notification.permission === "granted") {
-        await registerWebPushSubscription(user.id);
-        setPushRegistered(true);
+        try {
+          await registerWebPushSubscription(user.id);
+        } catch (err) {
+          show(err instanceof Error ? err.message : "Device registration failed");
+          return;
+        }
+        setPushRegistered(await hasPushSubscription(user.id));
       }
       const result = await sendTestBackgroundPush(user.email);
       show(result.message);

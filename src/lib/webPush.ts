@@ -34,10 +34,27 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 /** Subscribe this device for Web Push (VAPID) and persist in Supabase. */
 export async function registerWebPushSubscription(userId: string): Promise<void> {
-  if (!isSupabaseEnabled() || !webPushSupported()) return;
-  if (Notification.permission !== "granted") return;
+  if (!isSupabaseEnabled()) throw new Error("Supabase is not configured.");
+  if (!webPushSupported()) {
+    throw new Error("Web Push is not available — check VITE_VAPID_PUBLIC_KEY and rebuild.");
+  }
+  if (Notification.permission !== "granted") {
+    throw new Error("Notification permission not granted.");
+  }
 
-  const reg = await navigator.serviceWorker.ready;
+  const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isIos && !isStandalonePwa()) {
+    throw new Error(
+      "On iPhone, add this app to your Home Screen first, then open it from the icon.",
+    );
+  }
+
+  let reg = await navigator.serviceWorker.getRegistration();
+  if (!reg) {
+    reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  }
+  reg = await navigator.serviceWorker.ready;
+
   let sub = await reg.pushManager.getSubscription();
 
   if (!sub) {
@@ -49,21 +66,41 @@ export async function registerWebPushSubscription(userId: string): Promise<void>
 
   const json = sub.toJSON();
   if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) {
-    throw new Error("Invalid push subscription.");
+    throw new Error("Invalid push subscription from browser.");
   }
 
   const sb = getSupabase();
-  const { error } = await sb.from("push_subscriptions").upsert(
-    {
-      user_id: userId,
-      endpoint: json.endpoint,
-      p256dh: json.keys.p256dh,
-      auth: json.keys.auth,
-      user_agent: navigator.userAgent.slice(0, 240),
-    },
-    { onConflict: "endpoint" },
-  );
-  if (error) throw new Error(error.message);
+  const row = {
+    user_id: userId,
+    endpoint: json.endpoint,
+    p256dh: json.keys.p256dh,
+    auth: json.keys.auth,
+    user_agent: navigator.userAgent.slice(0, 240),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error: insertErr } = await sb.from("push_subscriptions").insert(row);
+  if (insertErr) {
+    if (insertErr.code === "23505") {
+      const { error: updateErr } = await sb
+        .from("push_subscriptions")
+        .update({
+          user_id: userId,
+          p256dh: row.p256dh,
+          auth: row.auth,
+          user_agent: row.user_agent,
+          updated_at: row.updated_at,
+        })
+        .eq("endpoint", row.endpoint);
+      if (updateErr) throw new Error(updateErr.message);
+    } else {
+      throw new Error(
+        insertErr.message.includes("push_subscriptions")
+          ? "Database table missing — run push_subscriptions migration in Supabase SQL Editor."
+          : insertErr.message,
+      );
+    }
+  }
 }
 
 /** Remove this device's push subscription from Supabase and unsubscribe locally. */
