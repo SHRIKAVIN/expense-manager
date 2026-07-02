@@ -1,12 +1,18 @@
+function hasCurrencyFraction(amount: number): boolean {
+  return Math.round(Math.abs(amount) * 100) % 100 !== 0;
+}
+
 export function formatCurrency(amount: number, currency = "INR"): string {
+  const showFraction = hasCurrencyFraction(amount);
   try {
     return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency,
-      maximumFractionDigits: 2,
+      minimumFractionDigits: showFraction ? 2 : 0,
+      maximumFractionDigits: showFraction ? 2 : 0,
     }).format(amount);
   } catch {
-    return `${amount.toFixed(2)}`;
+    return showFraction ? amount.toFixed(2) : String(Math.round(amount));
   }
 }
 
@@ -16,8 +22,27 @@ export function formatSignedCurrency(amount: number, currency = "INR"): string {
   return `${sign}${formatCurrency(Math.abs(amount), currency)}`;
 }
 
+/** Local calendar date as yyyy-mm-dd (not UTC). */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return localDateISO(d);
+}
+
+export function localDateISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function formatDateTime(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 export function isoToDate(iso: string): Date {

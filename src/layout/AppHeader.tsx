@@ -5,6 +5,7 @@ import { cn } from "@/lib/cn";
 import {
   ChartIcon,
   HomeIcon,
+  IncomeIcon,
   ListIcon,
   MenuIcon,
   SettingsIcon,
@@ -15,6 +16,7 @@ import { Sheet } from "@/components/Sheet";
 export const APP_NAV = [
   { to: "/", label: "Dashboard", icon: HomeIcon, end: true as const },
   { to: "/transactions", label: "Transactions", icon: ListIcon, end: false as const },
+  { to: "/income", label: "Income", icon: IncomeIcon, end: false as const },
   { to: "/budgets", label: "Budgets", icon: WalletIcon, end: false as const },
   { to: "/insights", label: "Insights", icon: ChartIcon, end: false as const },
   { to: "/settings", label: "Settings", icon: SettingsIcon, end: false as const },
@@ -78,6 +80,7 @@ export function AppHeader() {
             type="button"
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
+            data-testid="nav-menu-open"
             onClick={() => setMenuOpen(true)}
             className="h-10 w-12 -mr-2 flex items-center justify-center rounded-md text-ink outline-none"
           >
@@ -87,12 +90,13 @@ export function AppHeader() {
       </header>
 
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Navigate">
-        <nav className="flex flex-col gap-1 -mx-2">
+        <nav className="flex flex-col gap-1 -mx-2" data-testid="nav-menu">
           {APP_NAV.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
               end={end}
+              data-testid={`nav-link-${to === "/" ? "dashboard" : to.slice(1)}`}
               onClick={() => setMenuOpen(false)}
               className={({ isActive }) =>
                 cn(

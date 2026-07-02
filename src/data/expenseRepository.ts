@@ -2,7 +2,10 @@ import type {
   Category,
   Expense,
   ExpenseInput,
+  IncomeEntry,
+  IncomeInput,
   Receipt,
+  ReimbursementRequest,
   Recurring,
   RecurringFrequency,
   Role,
@@ -48,6 +51,11 @@ export interface ExpenseRepository {
   createExpense(input: ExpenseInput): Promise<Expense>;
   updateExpense(id: string, patch: Partial<ExpenseInput>): Promise<Expense>;
   deleteExpense(id: string): Promise<void>;
+  listIncome(): Promise<IncomeEntry[]>;
+  createIncome(input: IncomeInput): Promise<IncomeEntry>;
+  deleteIncome(id: string): Promise<void>;
+  listReimbursements(): Promise<ReimbursementRequest[]>;
+  completeReimbursement(id: string): Promise<void>;
   saveReceipt(dataUrl: string): Promise<Receipt>;
   getReceipt(id: string): Promise<Receipt | undefined>;
   listRecurring(): Promise<Recurring[]>;

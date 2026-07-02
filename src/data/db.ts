@@ -2,8 +2,10 @@ import Dexie, { type Table } from "dexie";
 import type {
   Category,
   Expense,
+  IncomeEntry,
   Recurring,
   Receipt,
+  ReimbursementRequest,
   User,
 } from "@/lib/types";
 
@@ -17,6 +19,8 @@ export class ExpenseDB extends Dexie {
   expenses!: Table<Expense, string>;
   receipts!: Table<Receipt, string>;
   recurring!: Table<Recurring, string>;
+  income!: Table<IncomeEntry, string>;
+  reimbursements!: Table<ReimbursementRequest, string>;
 
   constructor() {
     super("expense-manager");
@@ -26,6 +30,23 @@ export class ExpenseDB extends Dexie {
       expenses: "id, userId, [userId+date], categoryId, receiptId",
       receipts: "id, userId",
       recurring: "id, userId, [userId+nextDue]",
+    });
+    this.version(2).stores({
+      users: "id, email",
+      categories: "id, userId, [userId+archived]",
+      expenses: "id, userId, [userId+date], categoryId, receiptId",
+      receipts: "id, userId",
+      recurring: "id, userId, [userId+nextDue]",
+      income: "id, userId, [userId+month]",
+    });
+    this.version(3).stores({
+      users: "id, email",
+      categories: "id, userId, [userId+archived]",
+      expenses: "id, userId, [userId+date], categoryId, receiptId",
+      receipts: "id, userId",
+      recurring: "id, userId, [userId+nextDue]",
+      income: "id, userId, [userId+month]",
+      reimbursements: "id, requesterId, expenseId, [payerEmail+status]",
     });
   }
 }

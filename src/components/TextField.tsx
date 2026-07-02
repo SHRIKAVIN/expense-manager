@@ -5,7 +5,7 @@ import {
   type TextareaHTMLAttributes,
 } from "react";
 import { cn } from "@/lib/cn";
-import { AlertIcon } from "@/lib/icons";
+import { AlertIcon, CloseIcon } from "@/lib/icons";
 
 interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label?: string;
@@ -14,16 +14,34 @@ interface TextFieldProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "si
   shape?: "field" | "pill";
   leftAdornment?: ReactNode;
   rightAdornment?: ReactNode;
+  /** Show a clear (×) control when the field has a value. */
+  clearable?: boolean;
+  onClear?: () => void;
 }
 
 const shellClass =
   "flex items-center gap-2 bg-surface-pearl border border-hairline transition-colors focus-within:ring-2 focus-within:ring-primary-focus";
 
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { label, error, shape = "field", leftAdornment, rightAdornment, className, id, ...rest },
+  {
+    label,
+    error,
+    shape = "field",
+    leftAdornment,
+    rightAdornment,
+    clearable,
+    onClear,
+    className,
+    id,
+    value,
+    ...rest
+  },
   ref,
 ) {
   const inputId = id ?? rest.name;
+  const showClear =
+    clearable && typeof value === "string" && value.length > 0 && !rest.disabled && !rest.readOnly;
+
   return (
     <div className="flex flex-col gap-2">
       {label && (
@@ -42,9 +60,21 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         <input
           ref={ref}
           id={inputId}
+          value={value}
           className="w-full bg-transparent outline-none text-body text-ink placeholder:text-ink-muted-48"
           {...rest}
         />
+        {showClear && (
+          <button
+            type="button"
+            aria-label="Clear"
+            data-testid="search-clear"
+            onClick={() => onClear?.()}
+            className="shrink-0 h-7 w-7 rounded-full flex items-center justify-center text-ink-muted-48 outline-none hover:text-ink"
+          >
+            <CloseIcon size={16} />
+          </button>
+        )}
         {rightAdornment && <span className="shrink-0">{rightAdornment}</span>}
       </div>
       {error && (

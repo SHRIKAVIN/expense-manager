@@ -164,6 +164,14 @@ export const WalletIcon = (p: IconProps) => (
   </svg>
 );
 
+export const IncomeIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 4v10" />
+    <path d="m8 10 4 4 4-4" />
+    <path d="M4 19h16" />
+  </svg>
+);
+
 export const SettingsIcon = (p: IconProps) => (
   <svg {...base({ ...p, viewBox: "-2 -2 28 28" })}>
     <circle cx="12" cy="12" r="3" />

@@ -37,13 +37,27 @@ export const backdropVariants: Variants = {
 };
 
 export const sheetVariants: Variants = {
-  hidden: { y: "100%" },
-  visible: { y: 0 },
+  hidden: {
+    y: "100%",
+    transition: sheetSpring,
+  },
+  visible: {
+    y: 0,
+    transition: sheetSpring,
+  },
 };
 
 export const modalVariants: Variants = {
-  hidden: { opacity: 0, scale: 0.96 },
-  visible: { opacity: 1, scale: 1 },
+  hidden: {
+    opacity: 0,
+    scale: 0.96,
+    transition: { duration: 0.18, ease: "easeOut" },
+  },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.18, ease: "easeOut" },
+  },
 };
 
 /** List item enter: fade + slight upward slide, staggered. */

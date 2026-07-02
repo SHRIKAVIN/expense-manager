@@ -11,6 +11,14 @@ import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { ensureProfile } from "@/lib/supabase/ensureProfile";
 import { profileToSession } from "@/lib/supabase/mappers";
 import {
+  activateQuickSwitchUser,
+  cacheCurrentQuickSwitchSession,
+  isQuickSwitchEmail,
+  QUICK_SWITCH_USERS,
+  type QuickSwitchAccount,
+  type QuickSwitchEmail,
+} from "@/auth/quickSwitch";
+import {
   clearUserCache,
   readCachedAuthedUser,
   readProfileCache,
@@ -37,6 +45,9 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   updateProfile: (patch: Partial<Pick<User, "displayName" | "currency">>) => Promise<void>;
   setThemePreference: (pref: ThemePreference) => Promise<void>;
+  quickSwitchUsers: readonly QuickSwitchAccount[];
+  canQuickSwitch: boolean;
+  switchQuickUser: (email: QuickSwitchEmail) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -89,6 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
 
       if (session?.user) {
+        const email = session.user.email?.toLowerCase();
+        if (email && isQuickSwitchEmail(email)) {
+          void cacheCurrentQuickSwitchSession(email);
+        }
         const cached = readProfileCache(session.user.id);
         if (cached) applyUser(cached);
         void refreshProfile(session.user.id);
@@ -166,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.user) throw new Error("Sign in failed.");
 
     applyUser(await ensureProfile(data.user.id));
+    void cacheCurrentQuickSwitchSession(email);
   }, [applyUser, configError]);
 
   const logout = useCallback(async () => {
@@ -212,6 +228,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [applyUser, user],
   );
 
+  const switchQuickUser = useCallback(
+    async (email: QuickSwitchEmail) => {
+      if (!isSupabaseEnabled()) throw new Error(configError ?? "Supabase not configured.");
+      const currentEmail = user?.email?.toLowerCase();
+      if (currentEmail && isQuickSwitchEmail(currentEmail)) {
+        await cacheCurrentQuickSwitchSession(currentEmail);
+      }
+      clearUserCache(user?.id);
+      await activateQuickSwitchUser(email);
+      const { data: { session } } = await getSupabase().auth.getSession();
+      if (session?.user) {
+        applyUser(await ensureProfile(session.user.id));
+      }
+    },
+    [applyUser, configError, user?.email, user?.id],
+  );
+
+  const canQuickSwitch = Boolean(user?.email && isQuickSwitchEmail(user.email));
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -224,6 +259,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       updateProfile,
       setThemePreference,
+      quickSwitchUsers: QUICK_SWITCH_USERS,
+      canQuickSwitch,
+      switchQuickUser,
     }),
     [
       user,
@@ -235,6 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       updateProfile,
       setThemePreference,
+      canQuickSwitch,
+      switchQuickUser,
     ],
   );
 

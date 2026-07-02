@@ -4,7 +4,6 @@ import { createPortal } from "react-dom";
 import {
   backdropVariants,
   modalVariants,
-  sheetSpring,
   sheetVariants,
   usePrefersReducedMotion,
 } from "@/lib/motion";
@@ -46,9 +45,13 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
   const content = (
     <AnimatePresence>
       {open && (
-        <div
+        <motion.div
+          key="sheet-root"
           ref={overlayRef}
-          className="fixed z-50 flex flex-col justify-end lg:inset-0 lg:items-center lg:justify-center"
+          className="fixed z-50 inset-0 flex flex-col justify-end lg:items-center lg:justify-center"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 1 }}
         >
           <motion.div
             className="absolute inset-0 bg-surface-black"
@@ -63,16 +66,21 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
             role="dialog"
             aria-modal="true"
             aria-label={title}
+            data-testid="sheet-panel"
             className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[min(92dvh,100%)] flex flex-col shrink-0"
             variants={isDesktop ? modalVariants : sheetVariants}
             initial="hidden"
             animate="visible"
             exit="hidden"
-            transition={reduced ? { duration: 0 } : isDesktop ? { duration: 0.18 } : sheetSpring}
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-3 shrink-0">
               <h2 className="text-tagline text-ink">{title}</h2>
-              <Button variant="icon-circular" onClick={onClose} aria-label="Close">
+              <Button
+                variant="icon-circular"
+                onClick={onClose}
+                aria-label="Close"
+                data-testid="sheet-close"
+              >
                 <CloseIcon size={20} />
               </Button>
             </div>
@@ -85,7 +93,7 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
               </div>
             )}
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

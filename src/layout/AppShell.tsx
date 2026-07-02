@@ -5,22 +5,28 @@ import { cn } from "@/lib/cn";
 import { HomeIcon } from "@/lib/icons";
 import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { IncomeSheet } from "@/features/IncomeSheet";
 import { useAppData } from "@/data/AppDataProvider";
+import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
-const FAB_ROUTES = ["/", "/transactions", "/budgets"];
+const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
+const INCOME_FAB_ROUTE = "/income";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAppData();
   const location = useLocation();
   const reduced = usePrefersReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<HTMLElement>(null);
-  const showFab = can.writeExpenses && FAB_ROUTES.includes(location.pathname);
+  const showExpenseFab = can.writeExpenses && EXPENSE_FAB_ROUTES.includes(location.pathname);
+  const showIncomeFab = can.writeExpenses && location.pathname === INCOME_FAB_ROUTE;
+  const showFab = showExpenseFab || showIncomeFab;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
@@ -71,11 +77,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             </motion.div>
           </main>
 
-          {showFab && <Fab onClick={() => setAddOpen(true)} />}
+          {showExpenseFab && <Fab onClick={() => setAddOpen(true)} />}
+          {showIncomeFab && (
+            <Fab
+              onClick={() => setIncomeOpen(true)}
+              label="Add income"
+              data-testid="fab-add-income"
+            />
+          )}
         </div>
       </div>
 
       <ExpenseSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <IncomeSheet
+        open={incomeOpen}
+        onClose={() => setIncomeOpen(false)}
+        defaultMonth={getIncomeSelectedMonth()}
+      />
     </ScrolledContext.Provider>
   );
 }
@@ -95,6 +113,7 @@ function RailLink({
     <NavLink
       to={to}
       end={end}
+      data-testid={`nav-rail-${to === "/" ? "dashboard" : to.slice(1)}`}
       className={({ isActive }) =>
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2.5 text-body outline-none",

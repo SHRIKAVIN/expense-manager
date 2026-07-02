@@ -94,19 +94,22 @@ export function TransactionsScreen() {
   };
 
   return (
-    <Screen topInset={false}>
+    <Screen topInset={false} data-testid="transactions-screen">
       <ScreenHeader title="Transactions" />
 
-      <div className="flex flex-col gap-3 mb-5">
+      <div className="flex flex-col gap-3 mb-5" data-testid="transactions-filters">
         <TextField
           shape="pill"
           placeholder="Search merchants, notes…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          clearable
+          onClear={() => setSearch("")}
           leftAdornment={<SearchIcon size={18} />}
+          data-testid="transactions-search"
         />
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5">
-          <Chip selected={activeCat === null} onClick={() => setActiveCat(null)}>
+        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5" data-testid="transactions-category-chips">
+          <Chip selected={activeCat === null} onClick={() => setActiveCat(null)} data-testid="transactions-chip-all">
             All
           </Chip>
           {activeCategories.map((c) => (
@@ -122,12 +125,13 @@ export function TransactionsScreen() {
         </div>
 
         {/* Collapsible date-range filter + PDF export */}
-        <Card padded={false} className="overflow-hidden">
+        <Card padded={false} className="overflow-hidden" data-testid="transactions-export-card">
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
             className="w-full flex items-center justify-between px-5 py-3.5 outline-none"
             aria-expanded={filtersOpen}
+            data-testid="transactions-filter-toggle"
           >
             <span className="text-body-strong text-ink">Filter and Export</span>
             {filtersOpen ? (
@@ -166,7 +170,7 @@ export function TransactionsScreen() {
                     Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"} in
                     this range
                   </p>
-                  <Button variant="secondary" fullWidth onClick={exportPdf}>
+                  <Button variant="secondary" fullWidth onClick={exportPdf} data-testid="transactions-export-pdf">
                     <DownloadIcon size={18} /> Download PDF
                   </Button>
                 </div>

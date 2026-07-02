@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Screen } from "@/layout/Screen";
 import { Card } from "@/components/Card";
+import { SummaryStatCard } from "@/components/SummaryStatCard";
 import { Button } from "@/components/Button";
 import { CountUp } from "@/components/CountUp";
 import { ProgressBar } from "@/components/ProgressBar";
@@ -11,6 +12,7 @@ import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut, categorySliceStyle } from "@/features/CategoryDonut";
+import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
@@ -18,8 +20,9 @@ import {
   filterByMonth,
   spendByCategory,
   sum,
+  sumIncome,
 } from "@/lib/analytics";
-import { currentMonthKey, formatCurrency, monthLabel, relativeDue } from "@/lib/format";
+import { currentMonthKey, formatCurrency, listMonthKeys, monthLabel, relativeDue, shiftMonthKey } from "@/lib/format";
 import {
   AlertIcon,
   CategoryGlyph,
@@ -33,7 +36,7 @@ import { listItemVariants } from "@/lib/motion";
 export function DashboardScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, categories, categoriesById, recurring, removeExpense, refresh } = useAppData();
+  const { expenses, income, categories, categoriesById, recurring, removeExpense, refresh } = useAppData();
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -50,11 +53,38 @@ export function DashboardScreen() {
     );
   }, [expenses]);
 
+  const availableMonths = useMemo(() => {
+    const to = currentMonthKey();
+    const from = minMonth ?? shiftMonthKey(to, -23);
+    return listMonthKeys(from, to);
+  }, [minMonth]);
+
+  useEffect(() => {
+    if (!availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[availableMonths.length - 1] ?? currentMonthKey());
+    }
+  }, [availableMonths, selectedMonth]);
+
+  useEffect(() => {
+    if (expenses.length === 0) return;
+    const hasInMonth = expenses.some((e) => e.date.slice(0, 7) === selectedMonth);
+    if (!hasInMonth) {
+      const latest = expenses.reduce(
+        (max, e) => (e.date.slice(0, 7) > max ? e.date.slice(0, 7) : max),
+        expenses[0].date.slice(0, 7),
+      );
+      setSelectedMonth(latest);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync when expenses change
+  }, [expenses]);
+
   const monthExpenses = useMemo(
     () => filterByMonth(expenses, selectedMonth),
     [expenses, selectedMonth],
   );
   const totalSpent = useMemo(() => sum(monthExpenses), [monthExpenses]);
+  const monthIncomeTotal = useMemo(() => sumIncome(income, selectedMonth), [income, selectedMonth]);
+  const netRemaining = monthIncomeTotal - totalSpent;
   const slices = useMemo(
     () => spendByCategory(monthExpenses, categoriesById),
     [monthExpenses, categoriesById],
@@ -112,12 +142,18 @@ export function DashboardScreen() {
   const monthEmpty = !isEmpty && monthExpenses.length === 0;
 
   return (
-    <Screen>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <MonthPicker value={selectedMonth} onChange={setSelectedMonth} minMonth={minMonth} />
+    <Screen data-testid="dashboard-screen">
+      <div className="mb-4 flex items-center justify-between gap-3" data-testid="dashboard-toolbar">
+        <MonthPicker
+          value={selectedMonth}
+          onChange={setSelectedMonth}
+          minMonth={minMonth}
+          data-testid="dashboard-month-picker"
+        />
         <Button
           variant="icon-circular"
           aria-label="Refresh dashboard"
+          data-testid="dashboard-refresh"
           disabled={refreshing}
           onClick={() => void handleRefresh()}
           className={refreshing ? "shrink-0 [&_svg]:animate-spin" : "shrink-0"}
@@ -125,10 +161,27 @@ export function DashboardScreen() {
           <RefreshIcon size={20} />
         </Button>
       </div>
-      <div className="mb-6">
-        <p className="text-tagline text-ink-muted-80 mb-2">Total spent this month</p>
-        <CountUp value={totalSpent} currency={currency} className="text-display-lg text-ink" />
+      <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3" data-testid="dashboard-summary">
+        <SummaryStatCard label="Income" data-testid="dashboard-summary-income">
+          <CountUp
+            value={monthIncomeTotal}
+            currency={currency}
+            className="text-primary"
+          />
+        </SummaryStatCard>
+        <SummaryStatCard label="Spent" data-testid="dashboard-summary-spent">
+          <CountUp value={totalSpent} currency={currency} className="text-amber-700" />
+        </SummaryStatCard>
+        <SummaryStatCard label="Remaining" data-testid="dashboard-summary-remaining">
+          <CountUp
+            value={netRemaining}
+            currency={currency}
+            className={netRemaining >= 0 ? "text-emerald-600" : "text-red-600"}
+          />
+        </SummaryStatCard>
       </div>
+
+      <ReimbursementsOwedCard currency={currency} />
 
       {/* Upcoming recurring */}
       <AnimatePresence>
@@ -185,7 +238,7 @@ export function DashboardScreen() {
       ) : (
         <div className="mt-6 flex flex-col gap-4">
           {/* Donut + legend */}
-          <Card>
+          <Card data-testid="dashboard-donut">
             <p className="text-tagline text-ink mb-4">Spend by category</p>
             <CategoryDonut slices={slices} currency={currency} total={totalSpent} />
             <div className="mt-5 flex flex-col gap-2">
@@ -210,7 +263,7 @@ export function DashboardScreen() {
 
           {/* Budget health */}
           {budgeted.length > 0 && (
-            <Card>
+            <Card data-testid="dashboard-budget">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-tagline text-ink">Budget health</p>
                 {budgetTotals.totalSpentBudgeted > budgetTotals.totalLimit && (
@@ -236,7 +289,7 @@ export function DashboardScreen() {
           )}
 
           {/* Recent transactions */}
-          <Card padded={false} className="overflow-hidden">
+          <Card padded={false} className="overflow-hidden" data-testid="dashboard-recent">
             <div className="flex items-center justify-between px-6 pt-5 pb-3">
               <p className="text-tagline text-ink">Recent</p>
             </div>

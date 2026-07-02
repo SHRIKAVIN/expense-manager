@@ -8,6 +8,7 @@ import { AppShell } from "@/layout/AppShell";
 import { DashboardScreen } from "@/screens/DashboardScreen";
 import { TransactionsScreen } from "@/screens/TransactionsScreen";
 import { BudgetsScreen } from "@/screens/BudgetsScreen";
+import { IncomeScreen } from "@/screens/IncomeScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { AuthScreen } from "@/screens/AuthScreen";
 
@@ -69,6 +70,7 @@ function AuthedApp() {
           <Routes>
             <Route path="/" element={<DashboardScreen />} />
             <Route path="/transactions" element={<TransactionsScreen />} />
+            <Route path="/income" element={<IncomeScreen />} />
             <Route path="/budgets" element={<BudgetsScreen />} />
             <Route path="/insights" element={<InsightsScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
@@ -81,11 +83,11 @@ function AuthedApp() {
 }
 
 function Gate() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   if (status === "loading") return <Splash />;
   if (status === "anon") return <AuthScreen />;
   return (
-    <AppDataProvider>
+    <AppDataProvider key={user!.id}>
       <AuthedApp />
     </AppDataProvider>
   );

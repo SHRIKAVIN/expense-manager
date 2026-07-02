@@ -1,7 +1,9 @@
 import type {
   Category,
   Expense,
+  IncomeEntry,
   Receipt,
+  ReimbursementRequest,
   Recurring,
   SessionUser,
   ThemePreference,
@@ -9,7 +11,9 @@ import type {
 import type {
   DbCategory,
   DbExpense,
+  DbIncomeEntry,
   DbProfile,
+  DbReimbursementRequest,
   DbReceipt,
   DbRecurring,
 } from "@/lib/supabase/database.types";
@@ -77,5 +81,32 @@ export function toRecurring(row: DbRecurring): Recurring {
     paymentMethod: row.payment_method ?? undefined,
     notes: row.notes ?? undefined,
     createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+export function toIncome(row: DbIncomeEntry): IncomeEntry {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    amount: Number(row.amount),
+    month: row.month,
+    label: row.label ?? undefined,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+export function toReimbursement(row: DbReimbursementRequest): ReimbursementRequest {
+  return {
+    id: row.id,
+    expenseId: row.expense_id,
+    requesterId: row.requester_id,
+    requesterName: row.requester_name,
+    payerEmail: row.payer_email,
+    payerName: row.payer_name,
+    amount: Number(row.amount),
+    merchant: row.merchant,
+    status: row.status,
+    createdAt: new Date(row.created_at).getTime(),
+    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
   };
 }

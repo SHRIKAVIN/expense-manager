@@ -9,10 +9,18 @@ interface ChipProps {
   children: ReactNode;
   leftIcon?: ReactNode;
   className?: string;
+  "data-testid"?: string;
 }
 
 /** Pill-shaped selectable chip. Selected = 2px primary-focus border (no color swap). */
-export function Chip({ selected, onClick, children, leftIcon, className }: ChipProps) {
+export function Chip({
+  selected,
+  onClick,
+  children,
+  leftIcon,
+  className,
+  "data-testid": testId,
+}: ChipProps) {
   const reduced = usePrefersReducedMotion();
   return (
     <motion.button
@@ -21,6 +29,7 @@ export function Chip({ selected, onClick, children, leftIcon, className }: ChipP
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
       aria-pressed={selected}
+      data-testid={testId}
       className={cn(
         "shrink-0 inline-flex items-center gap-1.5 rounded-pill px-4 py-2 outline-none whitespace-nowrap bg-canvas",
         selected

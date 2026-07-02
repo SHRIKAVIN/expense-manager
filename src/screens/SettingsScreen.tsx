@@ -26,6 +26,7 @@ import {
 } from "@/lib/icons";
 import { formatCurrency, relativeDue } from "@/lib/format";
 import { exportExpensesPdf } from "@/lib/exportPdf";
+import type { QuickSwitchEmail } from "@/auth/quickSwitch";
 import type { Category, Recurring } from "@/lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -40,7 +41,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function SettingsScreen() {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout, updateProfile, canQuickSwitch, quickSwitchUsers, switchQuickUser } = useAuth();
   const { categories, recurring, expenses, categoriesById, can, repo, removeCategory, removeRecurring, refresh } =
     useAppData();
   const { show } = useToast();
@@ -128,6 +129,17 @@ export function SettingsScreen() {
     setConfirmCategory(null);
   };
 
+  const handleQuickSwitch = async (email: QuickSwitchEmail) => {
+    if (user?.email.toLowerCase() === email) return;
+    const account = quickSwitchUsers.find((u) => u.email === email);
+    try {
+      await switchQuickUser(email);
+      show(`Switched to ${account?.name ?? "user"}`);
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Could not switch user");
+    }
+  };
+
   const deleteAll = async () => {
     const ok = window.confirm(
       "Delete all your data? This removes every transaction, category and budget for your account. This cannot be undone.",
@@ -144,24 +156,49 @@ export function SettingsScreen() {
   };
 
   return (
-    <Screen topInset={false}>
+    <Screen topInset={false} data-testid="settings-screen">
       <ScreenHeader title="Settings" />
 
       <div className="flex flex-col gap-7">
         {/* Account */}
         <Section title="Account">
-          <Card className="flex flex-col gap-5">
-            <TextField label="Display name" value={name} onChange={(e) => setName(e.target.value)} />
+          <Card className="flex flex-col gap-5" data-testid="settings-account">
+            <TextField label="Display name" value={name} onChange={(e) => setName(e.target.value)} data-testid="settings-display-name" />
             <div className="flex gap-3">
-              <Button variant="primary" onClick={saveName} disabled={!canSaveName}>
+              <Button variant="primary" onClick={saveName} disabled={!canSaveName} data-testid="settings-save-name">
                 Save
               </Button>
-              <Button variant="secondary" onClick={logout}>
+              <Button variant="secondary" onClick={logout} data-testid="settings-sign-out">
                 <LogoutIcon size={18} /> Sign out
               </Button>
             </div>
           </Card>
         </Section>
+
+        {canQuickSwitch && (
+          <Section title="Switch user">
+            <Card className="flex flex-col gap-3" data-testid="settings-quick-switch">
+              <p className="text-caption text-ink-muted-48">
+                Switch between demo accounts without signing in again.
+              </p>
+              {quickSwitchUsers.map((account) => {
+                const active = user?.email.toLowerCase() === account.email;
+                return (
+                  <Button
+                    key={account.email}
+                    variant={active ? "primary" : "secondary"}
+                    fullWidth
+                    disabled={active}
+                    data-testid={`settings-switch-${account.name.toLowerCase()}`}
+                    onClick={() => void handleQuickSwitch(account.email)}
+                  >
+                    {active ? `Active: ${account.name}` : `Switch to ${account.name}`}
+                  </Button>
+                );
+              })}
+            </Card>
+          </Section>
+        )}
 
         {/* Appearance */}
         <Section title="Appearance">

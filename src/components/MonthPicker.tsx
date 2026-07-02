@@ -9,10 +9,11 @@ interface MonthPickerProps {
   /** Earliest month available in the list (yyyy-mm). */
   minMonth?: string;
   className?: string;
+  "data-testid"?: string;
 }
 
 /** Native `<select>` month picker — uses the OS dropdown/wheel on mobile. */
-export function MonthPicker({ value, onChange, minMonth, className }: MonthPickerProps) {
+export function MonthPicker({ value, onChange, minMonth, className, "data-testid": testId }: MonthPickerProps) {
   const months = useMemo(() => {
     const to = currentMonthKey();
     const from = minMonth ?? shiftMonthKey(to, -23);
@@ -25,6 +26,7 @@ export function MonthPicker({ value, onChange, minMonth, className }: MonthPicke
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Select month"
+        data-testid={testId}
         className="appearance-none rounded-md border border-hairline bg-surface-pearl pl-3.5 pr-10 py-2.5 text-body text-ink outline-none focus:ring-2 focus:ring-primary-focus"
       >
         {months.map((key) => (

@@ -17,7 +17,10 @@ import type {
   Category,
   Expense,
   ExpenseInput,
+  IncomeEntry,
+  IncomeInput,
   Recurring,
+  ReimbursementRequest,
   RecurringFrequency,
 } from "@/lib/types";
 
@@ -26,6 +29,12 @@ interface AppDataContextValue {
   repo: ExpenseRepository;
   categories: Category[];
   expenses: Expense[];
+  income: IncomeEntry[];
+  reimbursements: ReimbursementRequest[];
+  /** Pending reimbursements the current user asked for (maps expense id → request). */
+  reimbursementByExpenseId: Record<string, ReimbursementRequest>;
+  /** Pending reimbursements the current user must pay back. */
+  reimbursementsToPay: ReimbursementRequest[];
   recurring: Recurring[];
   categoriesById: Record<string, Category>;
   // permissions surfaced to the UI (and re-enforced in the repo layer)
@@ -39,6 +48,9 @@ interface AppDataContextValue {
   addExpense: (input: ExpenseInput) => Promise<void>;
   editExpense: (id: string, patch: Partial<ExpenseInput>) => Promise<void>;
   removeExpense: (id: string) => Promise<void>;
+  addIncome: (input: IncomeInput) => Promise<void>;
+  removeIncome: (id: string) => Promise<void>;
+  completeReimbursement: (id: string) => Promise<void>;
   addCategory: (input: { name: string; icon: string; monthlyBudget?: number }) => Promise<void>;
   editCategory: (
     id: string,
@@ -64,43 +76,64 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   if (!user) throw new Error("AppDataProvider requires an authenticated user");
 
-  const repo = useMemo(() => createRepository(user), [user]);
+  const repo = useMemo(() => createRepository(user), [user.id, user.role, user.email]);
   const cachedWorkspace = useMemo(() => readWorkspaceCache(user.id), [user.id]);
-  const [ready, setReady] = useState(() => cachedWorkspace !== null);
+  const [ready, setReady] = useState(false);
   const [categories, setCategories] = useState<Category[]>(() => cachedWorkspace?.categories ?? []);
   const [expenses, setExpenses] = useState<Expense[]>(() => cachedWorkspace?.expenses ?? []);
+  const [income, setIncome] = useState<IncomeEntry[]>(() => cachedWorkspace?.income ?? []);
+  const [reimbursements, setReimbursements] = useState<ReimbursementRequest[]>(
+    () => cachedWorkspace?.reimbursements ?? [],
+  );
   const [recurring, setRecurring] = useState<Recurring[]>(() => cachedWorkspace?.recurring ?? []);
 
   const refresh = useCallback(async () => {
-    const [cats, exps, recs] = await Promise.all([
+    const [cats, exps, inc, reimb, recs] = await Promise.all([
       repo.listCategories(true),
       repo.listExpenses(),
+      repo.listIncome(),
+      repo.listReimbursements(),
       repo.listRecurring(),
     ]);
     setCategories(cats);
     setExpenses(exps);
+    setIncome(inc);
+    setReimbursements(reimb);
     setRecurring(recs);
     writeWorkspaceCache(user.id, {
       categories: cats,
       expenses: exps,
+      income: inc,
+      reimbursements: reimb,
       recurring: recs,
     });
   }, [repo, user.id]);
 
   useEffect(() => {
     let cancelled = false;
+    const cached = readWorkspaceCache(user.id);
+
+    setReady(false);
+    setCategories(cached?.categories ?? []);
+    setExpenses(cached?.expenses ?? []);
+    setIncome(cached?.income ?? []);
+    setReimbursements(cached?.reimbursements ?? []);
+    setRecurring(cached?.recurring ?? []);
 
     (async () => {
-      await repo.ensureWorkspace();
-      await repo.generateDueRecurring();
-      await refresh();
-      if (!cancelled) setReady(true);
+      try {
+        await repo.ensureWorkspace();
+        await repo.generateDueRecurring();
+        await refresh();
+      } finally {
+        if (!cancelled) setReady(true);
+      }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [refresh, repo]);
+  }, [user.id, repo, refresh]);
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {
@@ -119,6 +152,32 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const removeExpense = useCallback(
     async (id: string) => {
       await repo.deleteExpense(id);
+      await refresh();
+    },
+    [repo, refresh],
+  );
+  const addIncome = useCallback(
+    async (input: IncomeInput) => {
+      const created = await repo.createIncome(input);
+      setIncome((prev) => [created, ...prev.filter((e) => e.id !== created.id)]);
+      try {
+        await refresh();
+      } catch {
+        /* keep optimistic row if background refresh fails */
+      }
+    },
+    [repo, refresh],
+  );
+  const removeIncome = useCallback(
+    async (id: string) => {
+      await repo.deleteIncome(id);
+      await refresh();
+    },
+    [repo, refresh],
+  );
+  const completeReimbursement = useCallback(
+    async (id: string) => {
+      await repo.completeReimbursement(id);
       await refresh();
     },
     [repo, refresh],
@@ -184,6 +243,27 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return map;
   }, [categories]);
 
+  const pendingReimbursements = useMemo(
+    () => reimbursements.filter((r) => r.status === "pending"),
+    [reimbursements],
+  );
+
+  const reimbursementByExpenseId = useMemo(() => {
+    const map: Record<string, ReimbursementRequest> = {};
+    for (const r of pendingReimbursements) {
+      if (r.requesterId === user.id) map[r.expenseId] = r;
+    }
+    return map;
+  }, [pendingReimbursements, user.id]);
+
+  const reimbursementsToPay = useMemo(
+    () =>
+      pendingReimbursements.filter(
+        (r) => r.payerEmail.toLowerCase() === user.email.toLowerCase(),
+      ),
+    [pendingReimbursements, user.email],
+  );
+
   const can = useMemo(
     () => ({
       writeExpenses: RolePolicy.canWriteExpenses(user.role),
@@ -200,6 +280,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       repo,
       categories,
       expenses,
+      income,
+      reimbursements,
+      reimbursementByExpenseId,
+      reimbursementsToPay,
       recurring,
       categoriesById,
       can,
@@ -207,6 +291,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       addExpense,
       editExpense,
       removeExpense,
+      addIncome,
+      removeIncome,
+      completeReimbursement,
       addCategory,
       editCategory,
       removeCategory,
@@ -219,6 +306,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       repo,
       categories,
       expenses,
+      income,
+      reimbursements,
+      reimbursementByExpenseId,
+      reimbursementsToPay,
       recurring,
       categoriesById,
       can,
@@ -226,6 +317,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       addExpense,
       editExpense,
       removeExpense,
+      addIncome,
+      removeIncome,
+      completeReimbursement,
       addCategory,
       editCategory,
       removeCategory,

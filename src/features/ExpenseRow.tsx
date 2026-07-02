@@ -25,7 +25,8 @@ export function ExpenseRow({
   onDelete,
   showDate,
 }: ExpenseRowProps) {
-  const { can, repo } = useAppData();
+  const { can, repo, reimbursementByExpenseId } = useAppData();
+  const pendingReimbursement = reimbursementByExpenseId[expense.id];
   const reduced = usePrefersReducedMotion();
   const x = useMotionValue(0);
   const revealOpacity = useTransform(x, [-80, -20], [1, 0]);
@@ -63,6 +64,7 @@ export function ExpenseRow({
           {category?.name ?? "Uncategorized"}
           {expense.paymentMethod ? ` · ${expense.paymentMethod}` : ""}
           {expense.recurringId ? " · recurring" : ""}
+          {pendingReimbursement ? ` · awaiting ${pendingReimbursement.payerName}` : ""}
         </p>
         {showDate && (
           <p className="text-fine-print text-ink-muted-48 mt-0.5">{formatDate(expense.date)}</p>

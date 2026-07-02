@@ -5,18 +5,20 @@ import { PlusIcon } from "@/lib/icons";
 interface FabProps {
   onClick: () => void;
   label?: string;
+  "data-testid"?: string;
 }
 
 /**
  * Floating Add-Expense FAB: 56px circular, Action Blue, the single drop-shadow (§1.3).
  */
-export function Fab({ onClick, label = "Add expense" }: FabProps) {
+export function Fab({ onClick, label = "Add expense", "data-testid": testId = "fab-add-expense" }: FabProps) {
   const reduced = usePrefersReducedMotion();
   return (
     <motion.button
       type="button"
       onClick={onClick}
       aria-label={label}
+      data-testid={testId}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
       className="absolute z-40 right-5 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 h-14 w-14 rounded-full bg-primary text-on-primary shadow-product flex items-center justify-center outline-none"

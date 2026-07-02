@@ -1,8 +1,14 @@
-import type { Category, Expense } from "./types";
+import type { Category, Expense, IncomeEntry } from "./types";
 import { isoToDate, monthKey } from "./format";
 
 export function sum(expenses: Expense[]): number {
   return expenses.reduce((acc, e) => acc + e.amount, 0);
+}
+
+export function sumIncome(entries: IncomeEntry[], month?: string): number {
+  return entries
+    .filter((e) => !month || e.month === month)
+    .reduce((acc, e) => acc + e.amount, 0);
 }
 
 export function filterByMonth(expenses: Expense[], key: string): Expense[] {

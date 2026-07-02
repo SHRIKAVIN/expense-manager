@@ -57,3 +57,26 @@ export interface DbRecurring {
   notes: string | null;
   created_at: string;
 }
+
+export interface DbIncomeEntry {
+  id: string;
+  user_id: string;
+  amount: number;
+  month: string;
+  label: string | null;
+  created_at: string;
+}
+
+export interface DbReimbursementRequest {
+  id: string;
+  expense_id: string;
+  requester_id: string;
+  payer_email: string;
+  payer_name: string;
+  requester_name: string;
+  amount: number;
+  merchant: string;
+  status: "pending" | "completed";
+  created_at: string;
+  completed_at: string | null;
+}

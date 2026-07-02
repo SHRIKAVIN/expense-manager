@@ -81,4 +81,43 @@ export interface ExpenseInput {
   paymentMethod?: string;
   notes?: string;
   receiptId?: string;
+  /** When set, creates a pending reimbursement request for the partner to pay back. */
+  requestReimbursement?: {
+    payerEmail: string;
+    payerName: string;
+    requesterName: string;
+  };
+}
+
+export type ReimbursementStatus = "pending" | "completed";
+
+export interface ReimbursementRequest {
+  id: string;
+  expenseId: string;
+  requesterId: string;
+  requesterName: string;
+  payerEmail: string;
+  payerName: string;
+  amount: number;
+  merchant: string;
+  status: ReimbursementStatus;
+  createdAt: number;
+  completedAt?: number;
+}
+
+/** Monthly income entry — multiple rows per month are summed on the dashboard. */
+export interface IncomeEntry {
+  id: string;
+  userId: string;
+  amount: number;
+  /** Month bucket yyyy-mm. */
+  month: string;
+  label?: string;
+  createdAt: number;
+}
+
+export interface IncomeInput {
+  amount: number;
+  month: string;
+  label?: string;
 }

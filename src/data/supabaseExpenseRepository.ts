@@ -2,6 +2,8 @@ import { getSupabase } from "@/lib/supabase/client";
 import {
   toCategory,
   toExpense,
+  toIncome,
+  toReimbursement,
   toReceipt,
   toRecurring,
 } from "@/lib/supabase/mappers";
@@ -25,7 +27,11 @@ function advanceDate(iso: string, frequency: RecurringFrequency): string {
 }
 
 function throwDb(message: string, code: RepositoryError["code"] = "validation"): never {
-  throw new RepositoryError(code, message);
+  const hint =
+    message.includes("income_entries") && message.includes("schema cache")
+      ? "Income table missing in Supabase. Run supabase/migrations/20260702_income_entries.sql in the SQL editor."
+      : message;
+  throw new RepositoryError(code, hint);
 }
 
 export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
@@ -203,7 +209,23 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
         .select()
         .single();
       if (error || !data) throwDb(error?.message ?? "Could not create expense.");
-      return toExpense(data);
+      const expense = toExpense(data);
+
+      if (input.requestReimbursement) {
+        const { error: reimbErr } = await sb().from("reimbursement_requests").insert({
+          expense_id: expense.id,
+          requester_id: userId,
+          payer_email: input.requestReimbursement.payerEmail.toLowerCase(),
+          payer_name: input.requestReimbursement.payerName,
+          requester_name: input.requestReimbursement.requesterName,
+          amount: expense.amount,
+          merchant: expense.merchant,
+          status: "pending",
+        });
+        if (reimbErr) throwDb(reimbErr.message);
+      }
+
+      return expense;
     },
 
     async updateExpense(id, patch) {
@@ -250,6 +272,65 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       if (exp.receipt_id) {
         await sb().from("receipts").delete().eq("id", exp.receipt_id).eq("user_id", userId);
       }
+    },
+
+    async listIncome() {
+      const { data, error } = await sb()
+        .from("income_entries")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+      if (error) throwDb(error.message);
+      return (data ?? []).map(toIncome);
+    },
+
+    async createIncome(input) {
+      requireWrite();
+      if (!(input.amount > 0)) throwDb("Amount must be greater than 0.");
+      if (!/^\d{4}-\d{2}$/.test(input.month)) throwDb("Month must be yyyy-mm.");
+      const { data, error } = await sb()
+        .from("income_entries")
+        .insert({
+          user_id: userId,
+          amount: input.amount,
+          month: input.month,
+          label: input.label?.trim() || null,
+        })
+        .select()
+        .single();
+      if (error || !data) throwDb(error?.message ?? "Could not add income.");
+      return toIncome(data);
+    },
+
+    async deleteIncome(id) {
+      requireWrite();
+      const { error } = await sb()
+        .from("income_entries")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+      if (error) throwDb(error.message);
+    },
+
+    async listReimbursements() {
+      const [asRequester, asPayer] = await Promise.all([
+        sb().from("reimbursement_requests").select("*").eq("requester_id", userId),
+        sb().from("reimbursement_requests").select("*").ilike("payer_email", user.email),
+      ]);
+      if (asRequester.error) throwDb(asRequester.error.message);
+      if (asPayer.error) throwDb(asPayer.error.message);
+      const byId = new Map<string, ReturnType<typeof toReimbursement>>();
+      for (const row of [...(asRequester.data ?? []), ...(asPayer.data ?? [])]) {
+        const mapped = toReimbursement(row);
+        byId.set(mapped.id, mapped);
+      }
+      return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+    },
+
+    async completeReimbursement(id) {
+      requireWrite();
+      const { error } = await sb().rpc("complete_reimbursement", { request_id: id });
+      if (error) throwDb(error.message);
     },
 
     async saveReceipt(dataUrl) {
@@ -425,6 +506,8 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
         throw new RepositoryError("forbidden", "Only an Owner can delete the account workspace.");
       }
       await sb().from("expenses").delete().eq("user_id", userId);
+      await sb().from("income_entries").delete().eq("user_id", userId);
+      await sb().from("reimbursement_requests").delete().eq("requester_id", userId);
       await sb().from("recurring").delete().eq("user_id", userId);
       await sb().from("receipts").delete().eq("user_id", userId);
       await sb().from("categories").delete().eq("user_id", userId);

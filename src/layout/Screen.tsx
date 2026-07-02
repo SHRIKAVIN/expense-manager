@@ -5,21 +5,21 @@ import { useScrolled } from "./scroll";
 export function Screen({
   children,
   className,
-  /** Adds top padding below AppHeader on mobile; on desktop uses lg inset or ScreenHeader. */
   topInset = true,
+  ...rest
 }: {
   children: ReactNode;
   className?: string;
   topInset?: boolean;
-}) {
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
         "mx-auto w-full max-w-2xl px-5 lg:px-8",
-        // Mobile: gap below AppHeader. Desktop: ScreenHeader or larger inset when topInset.
         topInset ? "pt-6 lg:pt-12" : "pt-6 lg:pt-0",
         className,
       )}
+      {...rest}
     >
       {children}
     </div>

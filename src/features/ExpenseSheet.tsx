@@ -5,6 +5,8 @@ import { TextField, TextArea } from "@/components/TextField";
 import { Chip } from "@/components/Chip";
 import { CategoryGlyph, CameraIcon, TrashIcon } from "@/lib/icons";
 import { useAppData } from "@/data/AppDataProvider";
+import { useAuth } from "@/auth/AuthProvider";
+import { getReimbursementPartner } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
 import { Lightbox } from "@/components/Lightbox";
 import { compressImage } from "@/lib/image";
@@ -20,7 +22,9 @@ interface ExpenseSheetProps {
 
 export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const { categories, addExpense, editExpense, repo } = useAppData();
+  const { user } = useAuth();
   const { show } = useToast();
+  const reimbursementPartner = user ? getReimbursementPartner(user.email) : null;
   const activeCategories = categories.filter((c) => !c.archived);
 
   const [amount, setAmount] = useState("");
@@ -29,6 +33,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const [date, setDate] = useState(todayISO());
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
+  const [requestReimbursement, setRequestReimbursement] = useState(false);
   const [receiptId, setReceiptId] = useState<string | undefined>(undefined);
   /** New receipt not yet uploaded — preview locally, persist on save. */
   const [pendingReceipt, setPendingReceipt] = useState<string | null>(null);
@@ -62,6 +67,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setDate(todayISO());
       setPaymentMethod("");
       setNotes("");
+      setRequestReimbursement(false);
       setReceiptId(undefined);
       setPendingReceipt(null);
       setReceiptPreview(null);
@@ -127,13 +133,25 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         paymentMethod: paymentMethod.trim() || undefined,
         notes: notes.trim() || undefined,
         receiptId: finalReceiptId,
+        requestReimbursement:
+          !editing && requestReimbursement && reimbursementPartner
+            ? {
+                payerEmail: reimbursementPartner.email,
+                payerName: reimbursementPartner.name,
+                requesterName: user?.displayName || user?.email.split("@")[0] || "User",
+              }
+            : undefined,
       };
       if (editing) {
         await editExpense(editing.id, payload);
         show("Expense updated");
       } else {
         await addExpense(payload);
-        show("Expense added");
+        show(
+          requestReimbursement && reimbursementPartner
+            ? `Expense added — ${reimbursementPartner.name} will be notified to reimburse`
+            : "Expense added",
+        );
       }
       onClose();
     } catch (err) {
@@ -149,12 +167,18 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       onClose={onClose}
       title={editing ? "Edit expense" : "Add expense"}
       footer={
-        <Button variant="primary" fullWidth onClick={submit} disabled={saving || attaching}>
+        <Button
+          variant="primary"
+          fullWidth
+          onClick={submit}
+          disabled={saving || attaching}
+          data-testid={editing ? "expense-save" : "expense-submit"}
+        >
           {editing ? "Save changes" : "Add expense"}
         </Button>
       }
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6" data-testid="expense-form">
         <TextField
           label="Amount"
           inputMode="decimal"
@@ -163,15 +187,17 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           onChange={(e) => setAmount(e.target.value)}
           error={errors.amount}
           autoFocus
+          data-testid="expense-amount"
         />
         <TextField
           label="Merchant / description"
           placeholder="e.g. Blue Bottle Coffee"
           value={merchant}
           onChange={(e) => setMerchant(e.target.value)}
+          data-testid="expense-merchant"
         />
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2" data-testid="expense-categories">
           <span className="text-caption-strong text-ink-muted-80">Category</span>
           <div className="flex flex-wrap gap-2">
             {activeCategories.map((c) => (
@@ -195,12 +221,14 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
+          data-testid="expense-date"
         />
         <TextField
           label="Payment method (optional)"
           placeholder="e.g. Visa •• 4242"
           value={paymentMethod}
           onChange={(e) => setPaymentMethod(e.target.value)}
+          data-testid="expense-payment"
         />
         <TextArea
           label="Notes (optional)"
@@ -208,9 +236,31 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           placeholder="Anything worth remembering"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          data-testid="expense-notes"
         />
 
-        <div className="flex flex-col gap-2">
+        {reimbursementPartner && !editing && (
+          <label
+            className="flex items-start gap-3 rounded-md border border-hairline px-4 py-3 cursor-pointer"
+            data-testid="expense-reimbursement-toggle"
+          >
+            <input
+              type="checkbox"
+              checked={requestReimbursement}
+              onChange={(e) => setRequestReimbursement(e.target.checked)}
+              className="mt-1 h-4 w-4 accent-primary"
+            />
+            <span>
+              <span className="text-body-strong text-ink block">Request reimbursement</span>
+              <span className="text-caption text-ink-muted-48">
+                Ask {reimbursementPartner.name} to pay you back. Once marked paid, this expense
+                is removed from your account.
+              </span>
+            </span>
+          </label>
+        )}
+
+        <div className="flex flex-col gap-2" data-testid="expense-receipt">
           <span className="text-caption-strong text-ink-muted-80">Receipt (optional)</span>
           <input
             ref={fileRef}
@@ -242,6 +292,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
               variant="secondary"
               disabled={attaching}
               onClick={() => fileRef.current?.click()}
+              data-testid="expense-receipt-add"
             >
               <CameraIcon size={18} /> {attaching ? "Processing…" : "Add receipt"}
             </Button>

@@ -1,4 +1,4 @@
-import type { Category, Expense, Recurring, SessionUser } from "@/lib/types";
+import type { Category, Expense, IncomeEntry, Recurring, ReimbursementRequest, SessionUser } from "@/lib/types";
 
 const PROFILE_PREFIX = "em.profile.v1.";
 const WORKSPACE_PREFIX = "em.workspace.v1.";
@@ -48,13 +48,22 @@ export interface WorkspaceCache {
   categories: Category[];
   expenses: Expense[];
   recurring: Recurring[];
+  income: IncomeEntry[];
+  reimbursements: ReimbursementRequest[];
 }
 
 export function readWorkspaceCache(userId: string): WorkspaceCache | null {
   try {
     const raw = localStorage.getItem(`${WORKSPACE_PREFIX}${userId}`);
     if (!raw) return null;
-    return JSON.parse(raw) as WorkspaceCache;
+    const parsed = JSON.parse(raw) as Partial<WorkspaceCache>;
+    return {
+      categories: parsed.categories ?? [],
+      expenses: parsed.expenses ?? [],
+      recurring: parsed.recurring ?? [],
+      income: parsed.income ?? [],
+      reimbursements: parsed.reimbursements ?? [],
+    };
   } catch {
     return null;
   }

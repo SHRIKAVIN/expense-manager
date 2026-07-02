@@ -9,7 +9,9 @@ import type {
   Category,
   Expense,
   ExpenseInput,
+  IncomeEntry,
   Receipt,
+  ReimbursementRequest,
   Recurring,
   RecurringFrequency,
   SessionUser,
@@ -28,6 +30,7 @@ function advanceDate(iso: string, frequency: RecurringFrequency): string {
 /** IndexedDB-backed repository (offline fallback when Supabase is not configured). */
 export function createLocalRepository(user: SessionUser): ExpenseRepository {
   const userId = user.id;
+  const userEmail = user.email.toLowerCase();
   const role = user.role;
 
   const requireWrite = () => {
@@ -157,6 +160,21 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         updatedAt: now,
       };
       await db.expenses.add(exp);
+      if (input.requestReimbursement) {
+        const reimb: ReimbursementRequest = {
+          id: uid("reimb"),
+          expenseId: exp.id,
+          requesterId: userId,
+          requesterName: input.requestReimbursement.requesterName,
+          payerEmail: input.requestReimbursement.payerEmail.toLowerCase(),
+          payerName: input.requestReimbursement.payerName,
+          amount: exp.amount,
+          merchant: exp.merchant,
+          status: "pending",
+          createdAt: now,
+        };
+        await db.reimbursements.add(reimb);
+      }
       return exp;
     },
 
@@ -178,6 +196,63 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (!exp || exp.userId !== userId) throw new RepositoryError("not_found", "Expense not found.");
       if (exp.receiptId) await db.receipts.delete(exp.receiptId);
       await db.expenses.delete(id);
+    },
+
+    async listIncome() {
+      const rows = await db.income.where("userId").equals(userId).toArray();
+      return rows.sort((a, b) => b.createdAt - a.createdAt);
+    },
+
+    async createIncome(input) {
+      requireWrite();
+      if (!(input.amount > 0)) throw new RepositoryError("validation", "Amount must be greater than 0.");
+      if (!/^\d{4}-\d{2}$/.test(input.month)) {
+        throw new RepositoryError("validation", "Month must be yyyy-mm.");
+      }
+      const row: IncomeEntry = {
+        id: uid("inc"),
+        userId,
+        amount: input.amount,
+        month: input.month,
+        label: input.label?.trim() || undefined,
+        createdAt: Date.now(),
+      };
+      await db.income.add(row);
+      return row;
+    },
+
+    async deleteIncome(id) {
+      requireWrite();
+      const row = await db.income.get(id);
+      if (!row || row.userId !== userId) throw new RepositoryError("not_found", "Income not found.");
+      await db.income.delete(id);
+    },
+
+    async listReimbursements() {
+      const [asRequester, asPayer] = await Promise.all([
+        db.reimbursements.where("requesterId").equals(userId).toArray(),
+        db.reimbursements.where("payerEmail").equals(userEmail).toArray(),
+      ]);
+      const byId = new Map<string, ReimbursementRequest>();
+      for (const row of [...asRequester, ...asPayer]) byId.set(row.id, row);
+      return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
+    },
+
+    async completeReimbursement(id) {
+      requireWrite();
+      const req = await db.reimbursements.get(id);
+      if (!req || req.status !== "pending") {
+        throw new RepositoryError("not_found", "Reimbursement request not found.");
+      }
+      if (req.payerEmail.toLowerCase() !== userEmail) {
+        throw new RepositoryError("forbidden", "You cannot complete this reimbursement.");
+      }
+      const exp = await db.expenses.get(req.expenseId);
+      if (exp && exp.userId === req.requesterId) {
+        if (exp.receiptId) await db.receipts.delete(exp.receiptId);
+        await db.expenses.delete(exp.id);
+      }
+      await db.reimbursements.update(id, { status: "completed", completedAt: Date.now() });
     },
 
     async saveReceipt(dataUrl) {
@@ -294,12 +369,18 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (role !== "Owner") {
         throw new RepositoryError("forbidden", "Only an Owner can delete the account workspace.");
       }
-      await db.transaction("rw", db.categories, db.expenses, db.recurring, db.receipts, async () => {
-        await db.categories.where("userId").equals(userId).delete();
-        await db.expenses.where("userId").equals(userId).delete();
-        await db.recurring.where("userId").equals(userId).delete();
-        await db.receipts.where("userId").equals(userId).delete();
-      });
+      await db.transaction(
+        "rw",
+        [db.categories, db.expenses, db.recurring, db.receipts, db.income, db.reimbursements],
+        async () => {
+          await db.categories.where("userId").equals(userId).delete();
+          await db.expenses.where("userId").equals(userId).delete();
+          await db.recurring.where("userId").equals(userId).delete();
+          await db.receipts.where("userId").equals(userId).delete();
+          await db.income.where("userId").equals(userId).delete();
+          await db.reimbursements.where("requesterId").equals(userId).delete();
+        },
+      );
     },
   };
 }
