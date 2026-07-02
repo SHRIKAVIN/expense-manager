@@ -219,7 +219,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       await repo.confirmReimbursement(id);
       await refresh();
       if (req) {
-        void notifyPush("Reimbursement confirmed", `${formatCurrency(req.amount, user.currency)} from ${req.payerName}`);
+        void notifyPush("Reimbursement confirmed", `${formatCurrency(req.amount, user.currency)} from ${req.payerName} — expense moved to ${req.payerName}`);
         void notifyPartnerReimbursementConfirmed(user, req);
       }
     },

@@ -14,7 +14,7 @@ export function ReimbursementsConfirmCard({ currency }: { currency: string }) {
   const handleConfirm = async (id: string, payerName: string, amount: number) => {
     try {
       await confirmReimbursement(id);
-      show(`Confirmed ${formatCurrency(amount, currency)} from ${payerName} — expense removed`);
+      show(`Confirmed ${formatCurrency(amount, currency)} from ${payerName} — expense moved to ${payerName}'s account`);
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not confirm reimbursement");
     }
@@ -35,7 +35,7 @@ export function ReimbursementsConfirmCard({ currency }: { currency: string }) {
         <p className="text-tagline text-ink">Confirm reimbursement</p>
         <p className="text-caption text-ink-muted-48 mt-1">
           Someone marked these as paid. Confirm only if you received the money — the expense will
-          then be removed.
+          be removed from your account and added to theirs.
         </p>
       </div>
       {reimbursementsToConfirm.map((req) => (
