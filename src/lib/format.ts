@@ -16,6 +16,40 @@ export function formatCurrency(amount: number, currency = "INR"): string {
   }
 }
 
+/** Compact total for chart centers, e.g. 37000 → "37K". */
+export function formatCompactAmount(amount: number, currency = "INR"): string {
+  const abs = Math.abs(amount);
+  const symbol =
+    currency === "INR"
+      ? "₹"
+      : currency === "USD"
+        ? "$"
+        : currency === "EUR"
+          ? "€"
+          : currency === "GBP"
+            ? "£"
+            : "";
+
+  if (abs >= 1_000_000) {
+    const m = abs / 1_000_000;
+    const n = m >= 10 ? Math.round(m) : Math.round(m * 10) / 10;
+    return `${symbol}${n}M`;
+  }
+  if (abs >= 1000) {
+    const k = abs / 1000;
+    const n = k >= 100 ? Math.round(k) : k >= 10 ? Math.round(k) : Math.round(k * 10) / 10;
+    return `${symbol}${n}K`;
+  }
+  return formatCurrency(amount, currency);
+}
+
+export function formatCategoryShare(amount: number, total: number): string {
+  if (total <= 0) return "0%";
+  const pct = (amount / total) * 100;
+  if (pct > 0 && pct < 10) return `${pct.toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
+}
+
 /** Signed formatting: expenses are negative outflows, prefixed with a sign per §1.1. */
 export function formatSignedCurrency(amount: number, currency = "INR"): string {
   const sign = amount < 0 ? "-" : "+";

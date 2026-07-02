@@ -304,6 +304,12 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       if (fetchErr) throwDb(fetchErr.message);
       if (!exp) throwDb("Expense not found.", "not_found");
 
+      const { error: reimbErr } = await sb()
+        .from("reimbursement_requests")
+        .delete()
+        .eq("expense_id", id);
+      if (reimbErr) throwDb(reimbErr.message);
+
       const { error } = await sb().from("expenses").delete().eq("id", id).eq("user_id", userId);
       if (error) throwDb(error.message);
 

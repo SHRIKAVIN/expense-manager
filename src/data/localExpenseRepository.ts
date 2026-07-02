@@ -230,6 +230,8 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const exp = await db.expenses.get(id);
       if (!exp || exp.userId !== userId) throw new RepositoryError("not_found", "Expense not found.");
+      const linkedReimb = await db.reimbursements.where("expenseId").equals(id).toArray();
+      await Promise.all(linkedReimb.map((r) => db.reimbursements.delete(r.id)));
       if (exp.receiptId) await db.receipts.delete(exp.receiptId);
       await db.expenses.delete(id);
     },

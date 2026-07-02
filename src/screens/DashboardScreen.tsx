@@ -11,7 +11,7 @@ import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MonthPicker } from "@/components/MonthPicker";
-import { CategoryDonut, categorySliceStyle } from "@/features/CategoryDonut";
+import { CategoryDonut } from "@/features/CategoryDonut";
 import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
 import { ReimbursementsConfirmCard } from "@/features/ReimbursementsConfirmCard";
 import {
@@ -30,7 +30,6 @@ import {
 import { currentMonthKey, formatCurrency, listMonthKeys, monthLabel, relativeDue, shiftMonthKey } from "@/lib/format";
 import {
   AlertIcon,
-  CategoryGlyph,
   ListIcon,
   RefreshIcon,
   RepeatIcon,
@@ -272,26 +271,13 @@ export function DashboardScreen() {
         <div className="mt-6 flex flex-col gap-4">
           {/* Donut + legend */}
           <Card data-testid="dashboard-donut">
-            <p className="text-tagline text-ink mb-4">Spend by category</p>
-            <CategoryDonut slices={slices} currency={currency} total={totalSpent} />
-            <div className="mt-5 flex flex-col gap-2">
-              {slices.slice(0, 5).map((s, i) => (
-                <div key={s.categoryId} className="flex items-center gap-3">
-                  <span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary-focus"
-                    style={categorySliceStyle(i, slices.length)}
-                    aria-hidden
-                  />
-                  <span className="text-ink-muted-80">
-                    <CategoryGlyph icon={s.icon} size={18} />
-                  </span>
-                  <span className="text-body text-ink flex-1 truncate">{s.name}</span>
-                  <span className="text-body text-ink-muted-80 tabular-nums">
-                    {formatCurrency(s.total, currency)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <CategoryDonut
+              slices={slices}
+              expenses={monthExpensesForTotals}
+              currency={currency}
+              total={totalSpent}
+              monthLabel={monthLabel(selectedMonth)}
+            />
           </Card>
 
           {/* Budget health */}

@@ -317,13 +317,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [reimbursements],
   );
 
+  const requesterExpenseIds = useMemo(
+    () => new Set(expenses.filter((e) => e.userId === user.id).map((e) => e.id)),
+    [expenses, user.id],
+  );
+
   const reimbursementByExpenseId = useMemo(() => {
     const map: Record<string, ReimbursementRequest> = {};
     for (const r of activeReimbursements) {
-      if (r.requesterId === user.id) map[r.expenseId] = r;
+      if (r.requesterId === user.id && requesterExpenseIds.has(r.expenseId)) {
+        map[r.expenseId] = r;
+      }
     }
     return map;
-  }, [activeReimbursements, user.id]);
+  }, [activeReimbursements, requesterExpenseIds, user.id]);
 
   const reimbursementsToPay = useMemo(
     () =>
@@ -338,9 +345,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const reimbursementsToConfirm = useMemo(
     () =>
       activeReimbursements.filter(
-        (r) => r.status === "awaiting_confirmation" && r.requesterId === user.id,
+        (r) =>
+          r.status === "awaiting_confirmation" &&
+          r.requesterId === user.id &&
+          requesterExpenseIds.has(r.expenseId),
       ),
-    [activeReimbursements, user.id],
+    [activeReimbursements, requesterExpenseIds, user.id],
   );
 
   const can = useMemo(
