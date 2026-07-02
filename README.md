@@ -26,7 +26,7 @@ A production-quality **Expense Manager Progressive Web App** built with **React 
 
 ## Supabase setup
 
-1. Create a project at [supabase.com](https://supabase.com).
+1. Create a project at [supabase.com](https://supabase.com) (or open your existing one).
 2. In **Project Settings → API**, copy the **Project URL** and **anon public** key.
 3. Copy `.env.example` to `.env.local` and paste your keys:
 
@@ -34,11 +34,65 @@ A production-quality **Expense Manager Progressive Web App** built with **React 
 cp .env.example .env.local
 ```
 
+```env
+VITE_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+```
+
 4. Open **SQL Editor** in Supabase and run the full contents of `supabase/schema.sql`.
 5. In **Authentication → Providers → Email**, disable **Confirm email** for local dev (optional — otherwise users must confirm before sign-in).
 6. Restart the dev server: `npm run dev`.
 
+### Switching Supabase accounts
+
+When you move to a new Supabase project:
+
+1. Update `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `.env.local`.
+2. Run `supabase/schema.sql` on the new project (SQL Editor).
+3. **Log the CLI into the same account** that owns the project (see below).
+4. Link: `supabase link --project-ref YOUR-PROJECT-REF` (ref = subdomain in the URL).
+5. Re-deploy Edge Functions and secrets on the new project.
+
+**CLI shows the wrong projects?** The Supabase CLI login is separate from `.env.local`. If `supabase projects list` shows a different org (e.g. KBS) than your app URL, run:
+
+```bash
+supabase logout
+supabase login          # sign in with the account that owns your expense-manager project
+supabase link --project-ref hjhysmcablfoyhwrehsc   # use your project ref from .env.local
+supabase functions deploy send-partner-push
+```
+
+**Browser login fails (“Could not create CLI login session”)?** Skip the browser flow and use a personal access token:
+
+1. Open [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) while signed into the **correct** account.
+2. **Generate new token** → copy it (starts with `sbp_`).
+3. In terminal:
+
+```bash
+supabase logout
+supabase login --token sbp_YOUR_TOKEN_HERE
+supabase projects list    # should show hjhysmcablfoyhwrehsc
+supabase link --project-ref hjhysmcablfoyhwrehsc
+supabase functions deploy send-partner-push
+```
+
+If login still fails, update the CLI (`brew upgrade supabase` or `npm i -g supabase@latest`) and retry.
+
+To keep multiple Supabase accounts on one machine, use CLI profiles:
+
+```bash
+supabase login --profile expense-manager
+supabase link --project-ref hjhysmcablfoyhwrehsc --profile expense-manager
+supabase functions deploy send-partner-push --profile expense-manager
+```
+
 Each signed-up user gets a `profiles` row (via database trigger) and their own categories, expenses, receipts, and recurring rules — protected by Row Level Security.
+
+### Web Push (optional — partner alerts when app is closed)
+
+1. Run `npm run vapid:generate` and add `VITE_VAPID_PUBLIC_KEY` to `.env.local`.
+2. In Supabase → **Edge Functions → Secrets**, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`.
+3. Deploy: `supabase functions deploy send-partner-push --project-ref YOUR-PROJECT-REF`
 
 ## Getting started
 

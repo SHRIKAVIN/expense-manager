@@ -4,6 +4,7 @@ import { isQuickSwitchEmail } from "@/auth/quickSwitch";
 import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/notifications";
 import { partnerAlertsEnabled } from "@/lib/partnerNotify";
+import { registerWebPushSubscription, webPushSupported } from "@/lib/webPush";
 import { useAppData } from "@/data/AppDataProvider";
 
 const SEEN_PREFIX = "em.notifications.seen.";
@@ -55,6 +56,12 @@ export function PartnerNotificationListener() {
     seenRef.current = readSeen(user.id);
     const email = user.email.toLowerCase();
     const sb = getSupabase();
+
+    if (Notification.permission === "granted" && webPushSupported()) {
+      void registerWebPushSubscription(user.id).catch(() => {
+        /* subscription optional */
+      });
+    }
 
     const deliver = (row: PartnerNotificationRow) => {
       if (seenRef.current.has(row.id)) return;

@@ -1,6 +1,7 @@
 import { getReimbursementPartner, isQuickSwitchEmail } from "@/auth/quickSwitch";
 import { formatCurrency } from "@/lib/format";
 import { isSupabaseEnabled, getSupabase } from "@/lib/supabase/client";
+import { invokePartnerWebPush } from "@/lib/webPush";
 import type { Expense, ReimbursementRequest, SessionUser } from "@/lib/types";
 
 export type PartnerNotificationKind =
@@ -47,7 +48,13 @@ async function sendPartnerNotification(input: {
   });
   if (error) {
     console.warn("Partner notification failed:", error.message);
+    return;
   }
+  void invokePartnerWebPush({
+    recipientEmail: input.recipientEmail,
+    title: input.title,
+    body: input.body,
+  });
 }
 
 function actorName(user: SessionUser): string {

@@ -13,7 +13,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
+      injectRegister: "auto",
       includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
+      injectManifest: {
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
+      },
       manifest: {
         name: "Expense Manager",
         short_name: "Expenses",
@@ -50,10 +57,6 @@ export default defineConfig({
             purpose: "maskable",
           },
         ],
-      },
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
-        navigateFallback: "/index.html",
       },
       devOptions: {
         enabled: true,

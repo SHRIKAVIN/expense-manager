@@ -21,6 +21,13 @@ import {
   setPartnerAlertsEnabled,
 } from "@/lib/partnerNotify";
 import {
+  isStandalonePwa,
+  registerWebPushSubscription,
+  unregisterWebPushSubscription,
+  vapidConfigured,
+  webPushSupported,
+} from "@/lib/webPush";
+import {
   CategoryGlyph,
   DownloadIcon,
   EditIcon,
@@ -123,13 +130,23 @@ export function SettingsScreen() {
       if (p === "granted") {
         setPartnerAlertsEnabled(user.id, true);
         setPartnerAlertsOn(true);
-        show("Partner alerts on");
+        if (webPushSupported()) {
+          try {
+            await registerWebPushSubscription(user.id);
+            show("Partner alerts on — background push enabled");
+          } catch {
+            show("Partner alerts on — open app once to finish push setup");
+          }
+        } else {
+          show(vapidConfigured() ? "Partner alerts on" : "Partner alerts on — add VAPID keys for background push");
+        }
       } else {
         show("Notification permission denied");
       }
     } else {
       setPartnerAlertsEnabled(user.id, false);
       setPartnerAlertsOn(false);
+      await unregisterWebPushSubscription(user.id);
       show("Partner alerts off");
     }
   };
@@ -366,21 +383,39 @@ export function SettingsScreen() {
               </Button>
             </div>
             {showPartnerAlerts && (
-              <div className="flex items-center justify-between gap-4 px-5 py-4">
-                <div>
-                  <p className="text-body text-ink">Partner activity alerts</p>
-                  <p className="text-caption text-ink-muted-48">
-                    Push when your partner adds expenses or updates reimbursements
-                  </p>
+              <div className="flex flex-col gap-3 px-5 py-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-body text-ink">Partner activity alerts</p>
+                    <p className="text-caption text-ink-muted-48">
+                      Push when your partner adds expenses or updates reimbursements (works when
+                      app is closed)
+                    </p>
+                  </div>
+                  <Button
+                    variant={partnerAlertsOn ? "secondary" : "primary"}
+                    onClick={() => void togglePartnerAlerts()}
+                    disabled={perm === "unsupported"}
+                    data-testid="settings-partner-alerts"
+                  >
+                    {partnerAlertsOn ? "On" : "Enable"}
+                  </Button>
                 </div>
-                <Button
-                  variant={partnerAlertsOn ? "secondary" : "primary"}
-                  onClick={() => void togglePartnerAlerts()}
-                  disabled={perm === "unsupported"}
-                  data-testid="settings-partner-alerts"
-                >
-                  {partnerAlertsOn ? "On" : "Enable"}
-                </Button>
+                {perm !== "unsupported" && !webPushSupported() && (
+                  <p className="text-caption text-ink-muted-48">
+                    Add <code className="text-fine-print">VITE_VAPID_PUBLIC_KEY</code> to{" "}
+                    <code className="text-fine-print">.env.local</code> and deploy the{" "}
+                    <code className="text-fine-print">send-partner-push</code> Edge Function for
+                    background notifications.
+                  </p>
+                )}
+                {perm !== "unsupported" && webPushSupported() && !isStandalonePwa() && (
+                  <p className="text-caption text-ink-muted-48">
+                    <strong>iPhone:</strong> Add this app to your Home Screen (Share → Add to Home
+                    Screen), then enable alerts. iOS 16.4+ required for Web Push when the app is
+                    closed.
+                  </p>
+                )}
               </div>
             )}
           </Card>
