@@ -409,7 +409,8 @@ begin
     body := jsonb_build_object(
       'recipient_email', NEW.recipient_email,
       'title', NEW.title,
-      'body', NEW.body
+      'body', NEW.body,
+      'notification_id', NEW.id::text
     )
   ) into request_id;
 

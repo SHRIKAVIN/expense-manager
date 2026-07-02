@@ -11,6 +11,7 @@ import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
+import { QuickSwitchViewOnlyBanner } from "@/features/QuickSwitchViewOnlyBanner";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -67,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           >
             <AppHeader />
+            <QuickSwitchViewOnlyBanner />
             <motion.div
               key={location.pathname}
               initial={reduced ? false : { opacity: 0 }}

@@ -13,8 +13,11 @@ import { profileToSession } from "@/lib/supabase/mappers";
 import {
   activateQuickSwitchUser,
   cacheCurrentQuickSwitchSession,
+  getQuickSwitchHomeEmail,
   isQuickSwitchEmail,
+  isQuickSwitchViewOnly,
   QUICK_SWITCH_USERS,
+  setQuickSwitchHomeEmail,
   type QuickSwitchAccount,
   type QuickSwitchEmail,
 } from "@/auth/quickSwitch";
@@ -47,6 +50,8 @@ interface AuthContextValue {
   setThemePreference: (pref: ThemePreference) => Promise<void>;
   quickSwitchUsers: readonly QuickSwitchAccount[];
   canQuickSwitch: boolean;
+  /** Viewing partner account via quick switch — read-only, no edits. */
+  isQuickSwitchViewOnly: boolean;
   switchQuickUser: (email: QuickSwitchEmail) => Promise<void>;
 }
 
@@ -103,6 +108,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const email = session.user.email?.toLowerCase();
         if (email && isQuickSwitchEmail(email)) {
           void cacheCurrentQuickSwitchSession(email);
+          if (!getQuickSwitchHomeEmail()) {
+            setQuickSwitchHomeEmail(email);
+          }
         }
         const cached = readProfileCache(session.user.id);
         if (cached) applyUser(cached);
@@ -150,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (data.session && data.user) {
       applyUser(await ensureProfile(data.user.id));
+      setQuickSwitchHomeEmail(email);
       return;
     }
 
@@ -181,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data.user) throw new Error("Sign in failed.");
 
     applyUser(await ensureProfile(data.user.id));
+    setQuickSwitchHomeEmail(email);
     void cacheCurrentQuickSwitchSession(email);
   }, [applyUser, configError]);
 
@@ -188,6 +198,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearUserCache(user?.id);
     if (isSupabaseEnabled()) {
       await getSupabase().auth.signOut();
+    }
+    try {
+      localStorage.removeItem("em.quickSwitch.homeEmail");
+    } catch {
+      /* no-op */
     }
     setAuthScreenMode("login");
     setUser(null);
@@ -197,6 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     async (patch: Partial<Pick<User, "displayName" | "currency">>) => {
       if (!user || !isSupabaseEnabled()) return;
+      if (isQuickSwitchViewOnly(user.email)) {
+        throw new Error("Read-only while viewing your partner's account.");
+      }
       const updates: Record<string, string> = {};
       if (patch.displayName !== undefined) updates.display_name = patch.displayName.trim();
       if (patch.currency !== undefined) updates.currency = patch.currency;
@@ -216,6 +234,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const setThemePreference = useCallback(
     async (pref: ThemePreference) => {
       if (!user || !isSupabaseEnabled()) return;
+      if (isQuickSwitchViewOnly(user.email)) {
+        throw new Error("Read-only while viewing your partner's account.");
+      }
       const { data, error } = await getSupabase()
         .from("profiles")
         .update({ theme_preference: pref })
@@ -246,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const canQuickSwitch = Boolean(user?.email && isQuickSwitchEmail(user.email));
+  const isQuickSwitchViewOnlyMode = Boolean(user?.email && isQuickSwitchViewOnly(user.email));
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -261,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setThemePreference,
       quickSwitchUsers: QUICK_SWITCH_USERS,
       canQuickSwitch,
+      isQuickSwitchViewOnly: isQuickSwitchViewOnlyMode,
       switchQuickUser,
     }),
     [
@@ -274,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateProfile,
       setThemePreference,
       canQuickSwitch,
+      isQuickSwitchViewOnlyMode,
       switchQuickUser,
     ],
   );

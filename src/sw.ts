@@ -15,6 +15,7 @@ registerRoute(
 );
 
 type PushPayload = {
+  id?: string;
   title?: string;
   body?: string;
   url?: string;
@@ -30,6 +31,7 @@ self.addEventListener("push", (event) => {
   const title = payload.title ?? "Expense Manager";
   const body = payload.body ?? "";
   const url = payload.url ?? "/";
+  const tag = payload.id ? `em-partner-${payload.id}` : `em-push-${Date.now()}`;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
@@ -39,7 +41,7 @@ self.addEventListener("push", (event) => {
         body,
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
-        tag: `em-push-${Date.now()}`,
+        tag,
         data: { url },
       });
     }),

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@/auth/AuthProvider";
-import { isQuickSwitchEmail } from "@/auth/quickSwitch";
+import { isQuickSwitchEmail, isQuickSwitchViewOnly } from "@/auth/quickSwitch";
 import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/notifications";
 import { partnerAlertsEnabled } from "@/lib/partnerNotify";
@@ -51,6 +51,7 @@ export function PartnerNotificationListener() {
 
   useEffect(() => {
     if (!user || !isSupabaseEnabled() || !isQuickSwitchEmail(user.email)) return;
+    if (isQuickSwitchViewOnly(user.email)) return;
     if (!partnerAlertsEnabled(user.id)) return;
 
     seenRef.current = readSeen(user.id);
@@ -66,21 +67,23 @@ export function PartnerNotificationListener() {
     const deliver = (row: PartnerNotificationRow) => {
       if (seenRef.current.has(row.id)) return;
       if (Notification.permission !== "granted") return;
-      markSeen(user.id, row.id);
       seenRef.current.add(row.id);
+      markSeen(user.id, row.id);
       void notifyPush(row.title, row.body);
       void refresh();
     };
 
+    // Seed seen ids from recent rows — do not re-alert on mount (Realtime handles new inserts).
     void (async () => {
       const { data } = await sb
         .from("partner_notifications")
-        .select("*")
+        .select("id")
         .ilike("recipient_email", email)
         .order("created_at", { ascending: false })
-        .limit(5);
-      for (const row of (data ?? []).reverse()) {
-        deliver(row as PartnerNotificationRow);
+        .limit(20);
+      for (const row of data ?? []) {
+        seenRef.current.add(row.id);
+        markSeen(user.id, row.id);
       }
     })();
 

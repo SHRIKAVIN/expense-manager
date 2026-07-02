@@ -11,6 +11,7 @@ type PushBody = {
   recipient_email?: string;
   title?: string;
   body?: string;
+  notification_id?: string;
 };
 
 async function sendPushToRecipient(input: {
@@ -19,6 +20,7 @@ async function sendPushToRecipient(input: {
   recipientEmail: string;
   title: string;
   body: string;
+  notificationId?: string;
 }) {
   const admin = createClient(input.supabaseUrl, input.serviceRole);
 
@@ -42,7 +44,12 @@ async function sendPushToRecipient(input: {
     return { sent: 0, reason: "no subscriptions" as const };
   }
 
-  const pushPayload = JSON.stringify({ title: input.title, body: input.body, url: "/" });
+  const pushPayload = JSON.stringify({
+    id: input.notificationId,
+    title: input.title,
+    body: input.body,
+    url: "/",
+  });
   let sent = 0;
   const stale: string[] = [];
 
@@ -135,6 +142,7 @@ Deno.serve(async (req) => {
       recipientEmail,
       title,
       body,
+      notificationId: payload.notification_id,
     });
 
     return new Response(JSON.stringify(result), {

@@ -56,7 +56,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function SettingsScreen() {
-  const { user, logout, updateProfile, canQuickSwitch, quickSwitchUsers, switchQuickUser } = useAuth();
+  const { user, logout, updateProfile, canQuickSwitch, quickSwitchUsers, switchQuickUser, isQuickSwitchViewOnly } = useAuth();
   const { categories, recurring, expenses, categoriesById, can, repo, removeCategory, removeRecurring, refresh } =
     useAppData();
   const { show } = useToast();
@@ -66,7 +66,7 @@ export function SettingsScreen() {
   const savedName = user?.displayName ?? "";
   const [name, setName] = useState(savedName);
   const nameDirty = name.trim() !== savedName.trim();
-  const canSaveName = nameDirty && name.trim().length > 0;
+  const canSaveName = nameDirty && name.trim().length > 0 && !isQuickSwitchViewOnly;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
@@ -299,10 +299,12 @@ export function SettingsScreen() {
           <Section title="Switch user">
             <Card className="flex flex-col gap-3" data-testid="settings-quick-switch">
               <p className="text-caption text-ink-muted-48">
-                Switch between demo accounts without signing in again.
+                Switch to your partner&apos;s account to view their expenses (read-only). Your own
+                account keeps full edit access.
               </p>
               {quickSwitchUsers.map((account) => {
                 const active = user?.email.toLowerCase() === account.email;
+                const isHome = !isQuickSwitchViewOnly && active;
                 return (
                   <Button
                     key={account.email}
@@ -312,7 +314,11 @@ export function SettingsScreen() {
                     data-testid={`settings-switch-${account.name.toLowerCase()}`}
                     onClick={() => void handleQuickSwitch(account.email)}
                   >
-                    {active ? `Active: ${account.name}` : `Switch to ${account.name}`}
+                    {isHome
+                      ? `Active: ${account.name}`
+                      : active
+                        ? `Viewing: ${account.name} (read-only)`
+                        : `View ${account.name}'s account`}
                   </Button>
                 );
               })}
@@ -455,7 +461,7 @@ export function SettingsScreen() {
                 {remindersOn ? "On" : "Enable"}
               </Button>
             </div>
-            {showPartnerAlerts && (
+            {showPartnerAlerts && !isQuickSwitchViewOnly && (
               <div className="flex flex-col gap-3 px-5 py-4">
                 <div className="flex items-center justify-between gap-4">
                   <div>

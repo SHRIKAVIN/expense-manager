@@ -1,6 +1,7 @@
 import { getSupabase } from "@/lib/supabase/client";
 
 const SESSIONS_KEY = "em.quickSwitch.sessions.v1";
+const HOME_EMAIL_KEY = "em.quickSwitch.homeEmail";
 
 /** Dev/demo quick-switch accounts only — do not use in production builds. */
 export const QUICK_SWITCH_USERS = [
@@ -42,6 +43,38 @@ export function getReimbursementPartner(email: string): QuickSwitchAccount | nul
   const normalized = email.toLowerCase();
   if (!isQuickSwitchEmail(normalized)) return null;
   return QUICK_SWITCH_USERS.find((u) => u.email !== normalized) ?? null;
+}
+
+/** Email of the account the user signed into (not a switched-to partner view). */
+export function getQuickSwitchHomeEmail(): QuickSwitchEmail | null {
+  try {
+    const raw = localStorage.getItem(HOME_EMAIL_KEY)?.toLowerCase();
+    return raw && isQuickSwitchEmail(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setQuickSwitchHomeEmail(email: string): void {
+  if (!isQuickSwitchEmail(email)) return;
+  try {
+    localStorage.setItem(HOME_EMAIL_KEY, email.toLowerCase());
+  } catch {
+    /* no-op */
+  }
+}
+
+/** True when viewing the partner account via quick switch (read-only). */
+export function isQuickSwitchViewOnly(currentEmail: string): boolean {
+  const current = currentEmail.toLowerCase();
+  if (!isQuickSwitchEmail(current)) return false;
+  const home = getQuickSwitchHomeEmail();
+  return Boolean(home && home !== current);
+}
+
+export function getQuickSwitchAccountName(email: string): string | null {
+  const account = QUICK_SWITCH_USERS.find((u) => u.email === email.toLowerCase());
+  return account?.name ?? null;
 }
 
 export async function cacheCurrentQuickSwitchSession(email: string) {

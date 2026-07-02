@@ -30,6 +30,7 @@ import type {
   Recurring,
   ReimbursementRequest,
   RecurringFrequency,
+  Role,
 } from "@/lib/types";
 
 interface AppDataContextValue {
@@ -85,10 +86,15 @@ interface AppDataContextValue {
 const AppDataContext = createContext<AppDataContextValue | null>(null);
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isQuickSwitchViewOnly } = useAuth();
   if (!user) throw new Error("AppDataProvider requires an authenticated user");
 
-  const repo = useMemo(() => createRepository(user), [user.id, user.role, user.email]);
+  const effectiveRole: Role = isQuickSwitchViewOnly ? "Viewer" : user.role;
+  const repoUser = useMemo(
+    () => (effectiveRole === user.role ? user : { ...user, role: effectiveRole }),
+    [user, effectiveRole],
+  );
+  const repo = useMemo(() => createRepository(repoUser), [repoUser]);
   const cachedWorkspace = useMemo(() => readWorkspaceCache(user.id), [user.id]);
   const [ready, setReady] = useState(false);
   const [categories, setCategories] = useState<Category[]>(() => cachedWorkspace?.categories ?? []);
@@ -331,12 +337,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const can = useMemo(
     () => ({
-      writeExpenses: RolePolicy.canWriteExpenses(user.role),
-      manageConfig: RolePolicy.canManageConfig(user.role),
-      manageRecurring: RolePolicy.canManageRecurring(user.role),
-      exportData: RolePolicy.canExportData(user.role),
+      writeExpenses: RolePolicy.canWriteExpenses(effectiveRole),
+      manageConfig: RolePolicy.canManageConfig(effectiveRole),
+      manageRecurring: RolePolicy.canManageRecurring(effectiveRole),
+      exportData: RolePolicy.canExportData(effectiveRole),
     }),
-    [user.role],
+    [effectiveRole],
   );
 
   const value = useMemo<AppDataContextValue>(
