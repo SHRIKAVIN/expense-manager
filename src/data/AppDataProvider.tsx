@@ -13,6 +13,14 @@ import {
   readWorkspaceCache,
   writeWorkspaceCache,
 } from "@/lib/cache/userCache";
+import { formatCurrency } from "@/lib/format";
+import { notifyPush } from "@/lib/notifications";
+import {
+  notifyPartnerExpenseAdded,
+  notifyPartnerReimbursementConfirmed,
+  notifyPartnerReimbursementMarkedPaid,
+  notifyPartnerReimbursementRejected,
+} from "@/lib/partnerNotify";
 import type {
   Category,
   Expense,
@@ -141,10 +149,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {
-      await repo.createExpense(input);
+      const created = await repo.createExpense(input);
       await refresh();
+      const amount = formatCurrency(created.amount, user.currency);
+      if (input.requestReimbursement) {
+        void notifyPush("Reimbursement requested", `${amount} at ${created.merchant}`);
+      } else {
+        void notifyPush("Expense added", `${amount} at ${created.merchant}`);
+      }
+      void notifyPartnerExpenseAdded(user, created, Boolean(input.requestReimbursement));
     },
-    [repo, refresh],
+    [repo, refresh, user],
   );
   const editExpense = useCallback(
     async (id: string, patch: Partial<ExpenseInput>) => {
@@ -181,24 +196,39 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
   const markReimbursementPaid = useCallback(
     async (id: string) => {
+      const req = reimbursements.find((r) => r.id === id);
       await repo.markReimbursementPaid(id);
       await refresh();
+      if (req) {
+        void notifyPush("Marked as paid", `${formatCurrency(req.amount, user.currency)} to ${req.requesterName}`);
+        void notifyPartnerReimbursementMarkedPaid(user, req);
+      }
     },
-    [repo, refresh],
+    [repo, refresh, reimbursements, user],
   );
   const confirmReimbursement = useCallback(
     async (id: string) => {
+      const req = reimbursements.find((r) => r.id === id);
       await repo.confirmReimbursement(id);
       await refresh();
+      if (req) {
+        void notifyPush("Reimbursement confirmed", `${formatCurrency(req.amount, user.currency)} from ${req.payerName}`);
+        void notifyPartnerReimbursementConfirmed(user, req);
+      }
     },
-    [repo, refresh],
+    [repo, refresh, reimbursements, user],
   );
   const rejectReimbursementPaid = useCallback(
     async (id: string) => {
+      const req = reimbursements.find((r) => r.id === id);
       await repo.rejectReimbursementPaid(id);
       await refresh();
+      if (req) {
+        void notifyPush("Payment not confirmed", `${req.payerName} will be notified`);
+        void notifyPartnerReimbursementRejected(user, req);
+      }
     },
-    [repo, refresh],
+    [repo, refresh, reimbursements, user],
   );
   const addCategory = useCallback(
     async (input: { name: string; icon: string; monthlyBudget?: number }) => {

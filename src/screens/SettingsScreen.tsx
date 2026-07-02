@@ -8,6 +8,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CategorySheet } from "@/features/CategorySheet";
 import { RecurringSheet } from "@/features/RecurringSheet";
 import { useAuth } from "@/auth/AuthProvider";
+import { isQuickSwitchEmail } from "@/auth/quickSwitch";
 import { useAppData } from "@/data/AppDataProvider";
 import { useToast } from "@/components/Toast";
 import { usePwaInstall } from "@/lib/usePwaInstall";
@@ -15,6 +16,10 @@ import {
   notificationPermission,
   requestNotificationPermission,
 } from "@/lib/notifications";
+import {
+  partnerAlertsEnabled,
+  setPartnerAlertsEnabled,
+} from "@/lib/partnerNotify";
 import {
   CategoryGlyph,
   DownloadIcon,
@@ -54,6 +59,8 @@ export function SettingsScreen() {
   const canSaveName = nameDirty && name.trim().length > 0;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
+  const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
+  const showPartnerAlerts = Boolean(user?.email && isQuickSwitchEmail(user.email));
 
   const [catSheet, setCatSheet] = useState<{ open: boolean; editing: Category | null }>({
     open: false,
@@ -74,6 +81,10 @@ export function SettingsScreen() {
   useEffect(() => {
     setRemindersOn(localStorage.getItem(remindersKey) === "1");
   }, [remindersKey]);
+
+  useEffect(() => {
+    if (user?.id) setPartnerAlertsOn(partnerAlertsEnabled(user.id));
+  }, [user?.id]);
 
   useEffect(() => {
     setName(user?.displayName ?? "");
@@ -101,6 +112,25 @@ export function SettingsScreen() {
       localStorage.removeItem(remindersKey);
       setRemindersOn(false);
       show("Reminders off");
+    }
+  };
+
+  const togglePartnerAlerts = async () => {
+    if (!user) return;
+    if (!partnerAlertsOn) {
+      const p = await requestNotificationPermission();
+      setPerm(p);
+      if (p === "granted") {
+        setPartnerAlertsEnabled(user.id, true);
+        setPartnerAlertsOn(true);
+        show("Partner alerts on");
+      } else {
+        show("Notification permission denied");
+      }
+    } else {
+      setPartnerAlertsEnabled(user.id, false);
+      setPartnerAlertsOn(false);
+      show("Partner alerts off");
     }
   };
 
@@ -317,22 +347,42 @@ export function SettingsScreen() {
 
         {/* Notifications */}
         <Section title="Notifications">
-          <Card className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-body text-ink">Recurring reminders</p>
-              <p className="text-caption text-ink-muted-48">
-                {perm === "unsupported"
-                  ? "Not supported on this device"
-                  : "Get notified before recurring expenses are due"}
-              </p>
+          <Card padded={false} className="overflow-hidden">
+            <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-divider-soft">
+              <div>
+                <p className="text-body text-ink">Recurring reminders</p>
+                <p className="text-caption text-ink-muted-48">
+                  {perm === "unsupported"
+                    ? "Not supported on this device"
+                    : "Get notified before recurring expenses are due"}
+                </p>
+              </div>
+              <Button
+                variant={remindersOn ? "secondary" : "primary"}
+                onClick={toggleReminders}
+                disabled={perm === "unsupported"}
+              >
+                {remindersOn ? "On" : "Enable"}
+              </Button>
             </div>
-            <Button
-              variant={remindersOn ? "secondary" : "primary"}
-              onClick={toggleReminders}
-              disabled={perm === "unsupported"}
-            >
-              {remindersOn ? "On" : "Enable"}
-            </Button>
+            {showPartnerAlerts && (
+              <div className="flex items-center justify-between gap-4 px-5 py-4">
+                <div>
+                  <p className="text-body text-ink">Partner activity alerts</p>
+                  <p className="text-caption text-ink-muted-48">
+                    Push when your partner adds expenses or updates reimbursements
+                  </p>
+                </div>
+                <Button
+                  variant={partnerAlertsOn ? "secondary" : "primary"}
+                  onClick={() => void togglePartnerAlerts()}
+                  disabled={perm === "unsupported"}
+                  data-testid="settings-partner-alerts"
+                >
+                  {partnerAlertsOn ? "On" : "Enable"}
+                </Button>
+              </div>
+            )}
           </Card>
         </Section>
 

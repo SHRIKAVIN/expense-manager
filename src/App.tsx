@@ -19,6 +19,7 @@ const InsightsScreen = lazy(() =>
 const DevScreen = lazy(() =>
   import("@/screens/DevScreen").then((m) => ({ default: m.DevScreen })),
 );
+import { PartnerNotificationListener } from "@/features/PartnerNotificationListener";
 import { notify } from "@/lib/notifications";
 import { daysUntil, relativeDue } from "@/lib/format";
 import { WalletIcon } from "@/lib/icons";
@@ -65,6 +66,7 @@ function AuthedApp() {
   return (
     <>
       <RecurringReminders />
+      <PartnerNotificationListener />
       <AppShell>
         <Suspense fallback={<Splash />}>
           <Routes>

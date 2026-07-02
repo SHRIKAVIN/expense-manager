@@ -257,6 +257,21 @@ grant execute on function public.mark_reimbursement_paid(uuid) to authenticated;
 grant execute on function public.confirm_reimbursement(uuid) to authenticated;
 grant execute on function public.reject_reimbursement_paid(uuid) to authenticated;
 
+-- Partner push notifications (expense + reimbursement alerts between demo users)
+create table if not exists public.partner_notifications (
+  id uuid primary key default gen_random_uuid(),
+  recipient_email text not null,
+  actor_name text not null,
+  title text not null,
+  body text not null,
+  kind text not null,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_partner_notifications_recipient
+  on public.partner_notifications (lower(recipient_email), created_at desc);
+
 notify pgrst, 'reload schema';
 
 -- Row Level Security
@@ -266,6 +281,7 @@ alter table public.expenses enable row level security;
 alter table public.receipts enable row level security;
 alter table public.income_entries enable row level security;
 alter table public.reimbursement_requests enable row level security;
+alter table public.partner_notifications enable row level security;
 alter table public.recurring enable row level security;
 
 create policy "profiles_select_own" on public.profiles for select using (auth.uid() = id);
@@ -285,5 +301,11 @@ create policy "reimbursement_select" on public.reimbursement_requests for select
 );
 create policy "reimbursement_insert_requester" on public.reimbursement_requests for insert with check (
   auth.uid() = requester_id
+);
+create policy "partner_notifications_select" on public.partner_notifications for select using (
+  lower(recipient_email) = lower((select email from public.profiles where id = auth.uid()))
+);
+create policy "partner_notifications_insert" on public.partner_notifications for insert with check (
+  auth.uid() is not null
 );
 create policy "recurring_all_own" on public.recurring for all using (auth.uid() = user_id);
