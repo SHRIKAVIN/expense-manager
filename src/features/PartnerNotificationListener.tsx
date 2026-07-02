@@ -3,6 +3,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { isQuickSwitchEmail, isQuickSwitchViewOnly } from "@/auth/quickSwitch";
 import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/notifications";
+import { incrementAppBadgeForNotification, syncAppBadgeFromStore } from "@/lib/appBadge";
 import { partnerAlertsEnabled } from "@/lib/partnerNotify";
 import { registerWebPushSubscription, webPushSupported } from "@/lib/webPush";
 import { useAppData } from "@/data/AppDataProvider";
@@ -64,12 +65,21 @@ export function PartnerNotificationListener() {
       });
     }
 
+    void syncAppBadgeFromStore();
+
     const deliver = (row: PartnerNotificationRow) => {
       if (seenRef.current.has(row.id)) return;
-      if (Notification.permission !== "granted") return;
       seenRef.current.add(row.id);
       markSeen(user.id, row.id);
-      void notifyPush(row.title, row.body);
+
+      if (document.visibilityState !== "visible") {
+        void incrementAppBadgeForNotification(row.id);
+      }
+
+      if (Notification.permission !== "granted") return;
+      if (document.visibilityState === "visible") {
+        void notifyPush(row.title, row.body);
+      }
       void refresh();
     };
 

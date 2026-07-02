@@ -12,6 +12,7 @@ import { getQuickSwitchAccountName } from "@/auth/quickSwitch";
 import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { useToast } from "@/components/Toast";
+import { clearAppBadge } from "@/lib/appBadge";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
 
@@ -50,6 +51,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     viewOnlyToastFor.current = null;
   }, [isQuickSwitchViewOnly, user?.displayName, user?.email, show]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void clearAppBadge();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    if (document.visibilityState === "visible") {
+      void clearAppBadge();
+    }
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, []);
 
   return (
     <ScrolledContext.Provider value={scrolled}>

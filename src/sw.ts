@@ -2,6 +2,7 @@
 import { cleanupOutdatedCaches, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { NetworkFirst } from "workbox-strategies";
+import { incrementAppBadgeForNotification } from "./lib/appBadge";
 
 declare let self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ url: string; revision: string | null }>;
@@ -34,9 +35,12 @@ self.addEventListener("push", (event) => {
   const tag = payload.id ? `em-partner-${payload.id}` : `em-push-${Date.now()}`;
 
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    (async () => {
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const appVisible = clients.some((c) => c.visibilityState === "visible");
       if (appVisible) return;
+
+      await incrementAppBadgeForNotification(payload.id);
       return self.registration.showNotification(title, {
         body,
         icon: "/icons/icon-192.png",
@@ -44,7 +48,7 @@ self.addEventListener("push", (event) => {
         tag,
         data: { url },
       });
-    }),
+    })(),
   );
 });
 
