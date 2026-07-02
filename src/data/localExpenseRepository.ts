@@ -185,8 +185,38 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (patch.amount !== undefined && !(patch.amount > 0)) {
         throw new RepositoryError("validation", "Amount must be greater than 0.");
       }
-      const next: Expense = { ...exp, ...patch, updatedAt: Date.now() };
+      const { requestReimbursement, clearReimbursement, ...expensePatch } = patch;
+      const next: Expense = { ...exp, ...expensePatch, updatedAt: Date.now() };
       await db.expenses.put(next);
+
+      const existingReimb = await db.reimbursements
+        .where("expenseId")
+        .equals(id)
+        .filter((r) => r.status !== "completed")
+        .first();
+
+      if (patch.clearReimbursement && existingReimb?.status === "pending") {
+        await db.reimbursements.delete(existingReimb.id);
+      } else if (requestReimbursement && !existingReimb) {
+        await db.reimbursements.add({
+          id: uid("reimb"),
+          expenseId: id,
+          requesterId: userId,
+          requesterName: requestReimbursement.requesterName,
+          payerEmail: requestReimbursement.payerEmail.toLowerCase(),
+          payerName: requestReimbursement.payerName,
+          amount: next.amount,
+          merchant: next.merchant,
+          status: "pending",
+          createdAt: Date.now(),
+        });
+      } else if (existingReimb?.status === "pending") {
+        await db.reimbursements.update(existingReimb.id, {
+          amount: next.amount,
+          merchant: next.merchant,
+        });
+      }
+
       return next;
     },
 

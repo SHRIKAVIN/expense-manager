@@ -252,7 +252,37 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
         .select()
         .single();
       if (error || !data) throwDb(error?.message ?? "Expense not found.", "not_found");
-      return toExpense(data);
+      const expense = toExpense(data);
+
+      const { data: existingReimb } = await sb()
+        .from("reimbursement_requests")
+        .select("id, status")
+        .eq("expense_id", id)
+        .neq("status", "completed")
+        .maybeSingle();
+
+      if (patch.clearReimbursement && existingReimb?.status === "pending") {
+        await sb().from("reimbursement_requests").delete().eq("id", existingReimb.id);
+      } else if (patch.requestReimbursement && !existingReimb) {
+        const { error: reimbErr } = await sb().from("reimbursement_requests").insert({
+          expense_id: expense.id,
+          requester_id: userId,
+          payer_email: patch.requestReimbursement.payerEmail.toLowerCase(),
+          payer_name: patch.requestReimbursement.payerName,
+          requester_name: patch.requestReimbursement.requesterName,
+          amount: expense.amount,
+          merchant: expense.merchant,
+          status: "pending",
+        });
+        if (reimbErr) throwDb(reimbErr.message);
+      } else if (existingReimb && existingReimb.status === "pending") {
+        await sb()
+          .from("reimbursement_requests")
+          .update({ amount: expense.amount, merchant: expense.merchant })
+          .eq("id", existingReimb.id);
+      }
+
+      return expense;
     },
 
     async deleteExpense(id) {

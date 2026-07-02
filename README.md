@@ -90,9 +90,23 @@ Each signed-up user gets a `profiles` row (via database trigger) and their own c
 
 ### Web Push (optional — partner alerts when app is closed)
 
+Background push needs **three things** beyond in-app Realtime alerts:
+
 1. Run `npm run vapid:generate` and add `VITE_VAPID_PUBLIC_KEY` to `.env.local`.
-2. In Supabase → **Edge Functions → Secrets**, set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`.
-3. Deploy: `supabase functions deploy send-partner-push --project-ref YOUR-PROJECT-REF`
+2. In Supabase → **Edge Functions → Secrets**, set:
+   - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` (e.g. `mailto:you@example.com`)
+   - `PARTNER_PUSH_WEBHOOK_SECRET` (any long random string)
+3. Deploy: `supabase functions deploy send-partner-push --project-ref hjhysmcablfoyhwrehsc`
+4. Run `supabase/migrations/20260704_partner_push_config_table.sql` in SQL Editor (or re-run `20260703` if fresh), then set the secret:
+
+```sql
+insert into public.partner_push_config (id, webhook_secret)
+values (1, 'same-secret-as-PARTNER_PUSH_WEBHOOK_SECRET')
+on conflict (id) do update set webhook_secret = excluded.webhook_secret;
+```
+
+5. **Both users** enable **Partner activity alerts** in Settings (registers their device).
+6. **iPhone:** Add to Home Screen (iOS 16.4+). Use **Test background push** in Settings, then close the app.
 
 ## Getting started
 

@@ -21,7 +21,12 @@ type PushPayload = {
 };
 
 self.addEventListener("push", (event) => {
-  const payload = (event.data?.json() ?? {}) as PushPayload;
+  let payload: PushPayload = {};
+  try {
+    payload = event.data ? (event.data.json() as PushPayload) : {};
+  } catch {
+    payload = { body: event.data?.text() ?? "" };
+  }
   const title = payload.title ?? "Expense Manager";
   const body = payload.body ?? "";
   const url = payload.url ?? "/";

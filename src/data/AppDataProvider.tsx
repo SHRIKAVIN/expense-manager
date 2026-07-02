@@ -163,10 +163,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
   const editExpense = useCallback(
     async (id: string, patch: Partial<ExpenseInput>) => {
+      const hadReimb = Boolean(reimbursements.find((r) => r.expenseId === id && r.status !== "completed"));
       await repo.updateExpense(id, patch);
       await refresh();
+      if (user && patch.requestReimbursement && !hadReimb) {
+        const updated = (await repo.listExpenses({})).find((e) => e.id === id);
+        if (updated) {
+          void notifyPartnerExpenseAdded(user, updated, true);
+        }
+      }
     },
-    [repo, refresh],
+    [repo, refresh, reimbursements, user],
   );
   const removeExpense = useCallback(
     async (id: string) => {

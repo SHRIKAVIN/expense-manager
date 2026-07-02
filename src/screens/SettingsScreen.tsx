@@ -21,8 +21,10 @@ import {
   setPartnerAlertsEnabled,
 } from "@/lib/partnerNotify";
 import {
+  hasPushSubscription,
   isStandalonePwa,
   registerWebPushSubscription,
+  sendTestBackgroundPush,
   unregisterWebPushSubscription,
   vapidConfigured,
   webPushSupported,
@@ -67,6 +69,8 @@ export function SettingsScreen() {
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
+  const [pushRegistered, setPushRegistered] = useState<boolean | null>(null);
+  const [testingPush, setTestingPush] = useState(false);
   const showPartnerAlerts = Boolean(user?.email && isQuickSwitchEmail(user.email));
 
   const [catSheet, setCatSheet] = useState<{ open: boolean; editing: Category | null }>({
@@ -92,6 +96,14 @@ export function SettingsScreen() {
   useEffect(() => {
     if (user?.id) setPartnerAlertsOn(partnerAlertsEnabled(user.id));
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || !partnerAlertsOn || !webPushSupported()) {
+      setPushRegistered(null);
+      return;
+    }
+    void hasPushSubscription(user.id).then(setPushRegistered);
+  }, [user?.id, partnerAlertsOn]);
 
   useEffect(() => {
     setName(user?.displayName ?? "");
@@ -133,8 +145,10 @@ export function SettingsScreen() {
         if (webPushSupported()) {
           try {
             await registerWebPushSubscription(user.id);
+            setPushRegistered(true);
             show("Partner alerts on — background push enabled");
           } catch {
+            setPushRegistered(false);
             show("Partner alerts on — open app once to finish push setup");
           }
         } else {
@@ -148,6 +162,21 @@ export function SettingsScreen() {
       setPartnerAlertsOn(false);
       await unregisterWebPushSubscription(user.id);
       show("Partner alerts off");
+    }
+  };
+
+  const testBackgroundPush = async () => {
+    if (!user?.email) return;
+    setTestingPush(true);
+    try {
+      if (webPushSupported() && Notification.permission === "granted") {
+        await registerWebPushSubscription(user.id);
+        setPushRegistered(true);
+      }
+      const result = await sendTestBackgroundPush(user.email);
+      show(result.message);
+    } finally {
+      setTestingPush(false);
     }
   };
 
@@ -415,6 +444,30 @@ export function SettingsScreen() {
                     Screen), then enable alerts. iOS 16.4+ required for Web Push when the app is
                     closed.
                   </p>
+                )}
+                {partnerAlertsOn && webPushSupported() && (
+                  <div className="flex flex-col gap-2">
+                    <p className="text-caption text-ink-muted-48">
+                      Background push:{" "}
+                      {pushRegistered === null
+                        ? "checking…"
+                        : pushRegistered
+                          ? "device registered"
+                          : "not registered — toggle alerts off/on"}
+                    </p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => void testBackgroundPush()}
+                      disabled={testingPush || perm !== "granted"}
+                      data-testid="settings-test-background-push"
+                    >
+                      {testingPush ? "Sending…" : "Test background push"}
+                    </Button>
+                    <p className="text-caption text-ink-muted-48">
+                      Tap test, then close the app completely. If no banner appears, deploy the Edge
+                      Function and set VAPID secrets in Supabase.
+                    </p>
+                  </div>
                 )}
               </div>
             )}

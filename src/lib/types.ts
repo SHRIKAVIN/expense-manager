@@ -87,6 +87,8 @@ export interface ExpenseInput {
     payerName: string;
     requesterName: string;
   };
+  /** When true on update, removes a pending reimbursement request for this expense. */
+  clearReimbursement?: boolean;
 }
 
 export type ReimbursementStatus = "pending" | "awaiting_confirmation" | "completed";

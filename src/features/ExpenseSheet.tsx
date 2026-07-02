@@ -21,7 +21,7 @@ interface ExpenseSheetProps {
 }
 
 export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
-  const { categories, addExpense, editExpense, repo } = useAppData();
+  const { categories, addExpense, editExpense, repo, reimbursementByExpenseId } = useAppData();
   const { user } = useAuth();
   const { show } = useToast();
   const reimbursementPartner = user ? getReimbursementPartner(user.email) : null;
@@ -44,6 +44,9 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const [receiptLightbox, setReceiptLightbox] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const existingReimbursement = editing ? reimbursementByExpenseId[editing.id] : undefined;
+  const reimbursementLocked = existingReimbursement?.status === "awaiting_confirmation";
+
   useEffect(() => {
     if (!open) return;
     if (editing) {
@@ -55,6 +58,8 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setNotes(editing.notes ?? "");
       setReceiptId(editing.receiptId);
       setPendingReceipt(null);
+      const activeReimb = reimbursementByExpenseId[editing.id];
+      setRequestReimbursement(Boolean(activeReimb));
       if (editing.receiptId) {
         repo.getReceipt(editing.receiptId).then((r) => setReceiptPreview(r?.dataUrl ?? null));
       } else {
@@ -74,7 +79,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
     }
     setErrors({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing]);
+  }, [open, editing, reimbursementByExpenseId]);
 
   const clearReceipt = () => {
     if (receiptPreview?.startsWith("blob:")) URL.revokeObjectURL(receiptPreview);
@@ -125,6 +130,15 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         finalReceiptId = undefined;
       }
 
+      const reimbPayload =
+        requestReimbursement && reimbursementPartner
+          ? {
+              payerEmail: reimbursementPartner.email,
+              payerName: reimbursementPartner.name,
+              requesterName: user?.displayName || user?.email.split("@")[0] || "User",
+            }
+          : undefined;
+
       const payload = {
         amount: amt,
         merchant: merchant.trim() || "Untitled",
@@ -133,18 +147,17 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         paymentMethod: paymentMethod.trim() || undefined,
         notes: notes.trim() || undefined,
         receiptId: finalReceiptId,
-        requestReimbursement:
-          !editing && requestReimbursement && reimbursementPartner
-            ? {
-                payerEmail: reimbursementPartner.email,
-                payerName: reimbursementPartner.name,
-                requesterName: user?.displayName || user?.email.split("@")[0] || "User",
-              }
-            : undefined,
+        requestReimbursement: !editing ? reimbPayload : reimbPayload && !existingReimbursement ? reimbPayload : undefined,
+        clearReimbursement:
+          Boolean(editing && existingReimbursement?.status === "pending" && !requestReimbursement),
       };
       if (editing) {
         await editExpense(editing.id, payload);
-        show("Expense updated");
+        if (reimbPayload && !existingReimbursement) {
+          show(`Expense updated — ${reimbursementPartner!.name} will be notified to reimburse`);
+        } else {
+          show("Expense updated");
+        }
       } else {
         await addExpense(payload);
         show(
@@ -239,22 +252,26 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           data-testid="expense-notes"
         />
 
-        {reimbursementPartner && !editing && (
+        {reimbursementPartner && (
           <label
-            className="flex items-start gap-3 rounded-md border border-hairline px-4 py-3 cursor-pointer"
+            className={`flex items-start gap-3 rounded-md border border-hairline px-4 py-3 ${
+              reimbursementLocked ? "opacity-80 cursor-default" : "cursor-pointer"
+            }`}
             data-testid="expense-reimbursement-toggle"
           >
             <input
               type="checkbox"
               checked={requestReimbursement}
+              disabled={reimbursementLocked}
               onChange={(e) => setRequestReimbursement(e.target.checked)}
-              className="mt-1 h-4 w-4 accent-primary"
+              className="mt-1 h-4 w-4 accent-primary disabled:opacity-50"
             />
             <span>
               <span className="text-body-strong text-ink block">Request reimbursement</span>
               <span className="text-caption text-ink-muted-48">
-                Ask {reimbursementPartner.name} to pay you back. After they mark paid, you
-                confirm receipt and the expense is removed.
+                {reimbursementLocked
+                  ? `${existingReimbursement!.payerName} marked this paid — confirm on the dashboard.`
+                  : `Ask ${reimbursementPartner.name} to pay you back. After they mark paid, you confirm receipt and the expense is removed.`}
               </span>
             </span>
           </label>
