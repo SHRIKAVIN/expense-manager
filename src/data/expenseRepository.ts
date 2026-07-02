@@ -55,7 +55,9 @@ export interface ExpenseRepository {
   createIncome(input: IncomeInput): Promise<IncomeEntry>;
   deleteIncome(id: string): Promise<void>;
   listReimbursements(): Promise<ReimbursementRequest[]>;
-  completeReimbursement(id: string): Promise<void>;
+  markReimbursementPaid(id: string): Promise<void>;
+  confirmReimbursement(id: string): Promise<void>;
+  rejectReimbursementPaid(id: string): Promise<void>;
   saveReceipt(dataUrl: string): Promise<Receipt>;
   getReceipt(id: string): Promise<Receipt | undefined>;
   listRecurring(): Promise<Recurring[]>;

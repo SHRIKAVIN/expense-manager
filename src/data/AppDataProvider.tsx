@@ -33,6 +33,8 @@ interface AppDataContextValue {
   reimbursements: ReimbursementRequest[];
   /** Pending reimbursements the current user asked for (maps expense id → request). */
   reimbursementByExpenseId: Record<string, ReimbursementRequest>;
+  /** Pending reimbursements waiting for the requester to confirm payment. */
+  reimbursementsToConfirm: ReimbursementRequest[];
   /** Pending reimbursements the current user must pay back. */
   reimbursementsToPay: ReimbursementRequest[];
   recurring: Recurring[];
@@ -50,7 +52,9 @@ interface AppDataContextValue {
   removeExpense: (id: string) => Promise<void>;
   addIncome: (input: IncomeInput) => Promise<void>;
   removeIncome: (id: string) => Promise<void>;
-  completeReimbursement: (id: string) => Promise<void>;
+  markReimbursementPaid: (id: string) => Promise<void>;
+  confirmReimbursement: (id: string) => Promise<void>;
+  rejectReimbursementPaid: (id: string) => Promise<void>;
   addCategory: (input: { name: string; icon: string; monthlyBudget?: number }) => Promise<void>;
   editCategory: (
     id: string,
@@ -175,9 +179,23 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     },
     [repo, refresh],
   );
-  const completeReimbursement = useCallback(
+  const markReimbursementPaid = useCallback(
     async (id: string) => {
-      await repo.completeReimbursement(id);
+      await repo.markReimbursementPaid(id);
+      await refresh();
+    },
+    [repo, refresh],
+  );
+  const confirmReimbursement = useCallback(
+    async (id: string) => {
+      await repo.confirmReimbursement(id);
+      await refresh();
+    },
+    [repo, refresh],
+  );
+  const rejectReimbursementPaid = useCallback(
+    async (id: string) => {
+      await repo.rejectReimbursementPaid(id);
       await refresh();
     },
     [repo, refresh],
@@ -243,25 +261,35 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return map;
   }, [categories]);
 
-  const pendingReimbursements = useMemo(
-    () => reimbursements.filter((r) => r.status === "pending"),
+  const activeReimbursements = useMemo(
+    () => reimbursements.filter((r) => r.status !== "completed"),
     [reimbursements],
   );
 
   const reimbursementByExpenseId = useMemo(() => {
     const map: Record<string, ReimbursementRequest> = {};
-    for (const r of pendingReimbursements) {
+    for (const r of activeReimbursements) {
       if (r.requesterId === user.id) map[r.expenseId] = r;
     }
     return map;
-  }, [pendingReimbursements, user.id]);
+  }, [activeReimbursements, user.id]);
 
   const reimbursementsToPay = useMemo(
     () =>
-      pendingReimbursements.filter(
-        (r) => r.payerEmail.toLowerCase() === user.email.toLowerCase(),
+      activeReimbursements.filter(
+        (r) =>
+          r.status === "pending" &&
+          r.payerEmail.toLowerCase() === user.email.toLowerCase(),
       ),
-    [pendingReimbursements, user.email],
+    [activeReimbursements, user.email],
+  );
+
+  const reimbursementsToConfirm = useMemo(
+    () =>
+      activeReimbursements.filter(
+        (r) => r.status === "awaiting_confirmation" && r.requesterId === user.id,
+      ),
+    [activeReimbursements, user.id],
   );
 
   const can = useMemo(
@@ -283,6 +311,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       income,
       reimbursements,
       reimbursementByExpenseId,
+      reimbursementsToConfirm,
       reimbursementsToPay,
       recurring,
       categoriesById,
@@ -293,7 +322,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeExpense,
       addIncome,
       removeIncome,
-      completeReimbursement,
+      markReimbursementPaid,
+      confirmReimbursement,
+      rejectReimbursementPaid,
       addCategory,
       editCategory,
       removeCategory,
@@ -309,6 +340,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       income,
       reimbursements,
       reimbursementByExpenseId,
+      reimbursementsToConfirm,
       reimbursementsToPay,
       recurring,
       categoriesById,
@@ -319,7 +351,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       removeExpense,
       addIncome,
       removeIncome,
-      completeReimbursement,
+      markReimbursementPaid,
+      confirmReimbursement,
+      rejectReimbursementPaid,
       addCategory,
       editCategory,
       removeCategory,

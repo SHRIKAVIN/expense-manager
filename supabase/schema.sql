@@ -78,7 +78,7 @@ create table if not exists public.income_entries (
 
 create index if not exists idx_income_user_month on public.income_entries (user_id, month desc);
 
--- Reimbursement requests between paired demo users (expense removed when payer marks done)
+-- Reimbursement requests between paired demo users (expense removed when requester confirms)
 create table if not exists public.reimbursement_requests (
   id uuid primary key default gen_random_uuid(),
   expense_id uuid not null,
@@ -88,7 +88,7 @@ create table if not exists public.reimbursement_requests (
   requester_name text not null,
   amount numeric not null check (amount > 0),
   merchant text not null,
-  status text not null default 'pending' check (status in ('pending', 'completed')),
+  status text not null default 'pending' check (status in ('pending', 'awaiting_confirmation', 'completed')),
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
@@ -161,7 +161,7 @@ $$;
 
 grant execute on function public.ensure_profile() to authenticated;
 
-create or replace function public.complete_reimbursement(request_id uuid)
+create or replace function public.mark_reimbursement_paid(request_id uuid)
 returns void
 language plpgsql
 security definer
@@ -170,27 +170,46 @@ as $$
 declare
   req public.reimbursement_requests;
   payer_email text;
-  exp_receipt uuid;
 begin
-  if auth.uid() is null then
-    raise exception 'Not authenticated';
-  end if;
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
 
   select email into payer_email from public.profiles where id = auth.uid();
-  if payer_email is null then
-    raise exception 'Profile not found';
-  end if;
+  if payer_email is null then raise exception 'Profile not found'; end if;
 
   select * into req from public.reimbursement_requests
   where id = request_id and status = 'pending'
   for update;
 
-  if not found then
-    raise exception 'Reimbursement request not found';
+  if not found then raise exception 'Reimbursement request not found'; end if;
+  if lower(req.payer_email) <> lower(payer_email) then
+    raise exception 'Not authorized to mark this reimbursement paid';
   end if;
 
-  if lower(req.payer_email) <> lower(payer_email) then
-    raise exception 'Not authorized to complete this reimbursement';
+  update public.reimbursement_requests
+  set status = 'awaiting_confirmation'
+  where id = request_id;
+end;
+$$;
+
+create or replace function public.confirm_reimbursement(request_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  req public.reimbursement_requests;
+  exp_receipt uuid;
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+
+  select * into req from public.reimbursement_requests
+  where id = request_id and status = 'awaiting_confirmation'
+  for update;
+
+  if not found then raise exception 'Reimbursement request not found'; end if;
+  if req.requester_id <> auth.uid() then
+    raise exception 'Not authorized to confirm this reimbursement';
   end if;
 
   select receipt_id into exp_receipt from public.expenses
@@ -208,7 +227,35 @@ begin
 end;
 $$;
 
-grant execute on function public.complete_reimbursement(uuid) to authenticated;
+create or replace function public.reject_reimbursement_paid(request_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  req public.reimbursement_requests;
+begin
+  if auth.uid() is null then raise exception 'Not authenticated'; end if;
+
+  select * into req from public.reimbursement_requests
+  where id = request_id and status = 'awaiting_confirmation'
+  for update;
+
+  if not found then raise exception 'Reimbursement request not found'; end if;
+  if req.requester_id <> auth.uid() then
+    raise exception 'Not authorized to reject this reimbursement';
+  end if;
+
+  update public.reimbursement_requests
+  set status = 'pending'
+  where id = request_id;
+end;
+$$;
+
+grant execute on function public.mark_reimbursement_paid(uuid) to authenticated;
+grant execute on function public.confirm_reimbursement(uuid) to authenticated;
+grant execute on function public.reject_reimbursement_paid(uuid) to authenticated;
 
 notify pgrst, 'reload schema';
 

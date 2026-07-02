@@ -238,14 +238,26 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
     },
 
-    async completeReimbursement(id) {
+    async markReimbursementPaid(id) {
       requireWrite();
       const req = await db.reimbursements.get(id);
       if (!req || req.status !== "pending") {
         throw new RepositoryError("not_found", "Reimbursement request not found.");
       }
       if (req.payerEmail.toLowerCase() !== userEmail) {
-        throw new RepositoryError("forbidden", "You cannot complete this reimbursement.");
+        throw new RepositoryError("forbidden", "You cannot mark this reimbursement paid.");
+      }
+      await db.reimbursements.update(id, { status: "awaiting_confirmation" });
+    },
+
+    async confirmReimbursement(id) {
+      requireWrite();
+      const req = await db.reimbursements.get(id);
+      if (!req || req.status !== "awaiting_confirmation") {
+        throw new RepositoryError("not_found", "Reimbursement request not found.");
+      }
+      if (req.requesterId !== userId) {
+        throw new RepositoryError("forbidden", "You cannot confirm this reimbursement.");
       }
       const exp = await db.expenses.get(req.expenseId);
       if (exp && exp.userId === req.requesterId) {
@@ -253,6 +265,18 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         await db.expenses.delete(exp.id);
       }
       await db.reimbursements.update(id, { status: "completed", completedAt: Date.now() });
+    },
+
+    async rejectReimbursementPaid(id) {
+      requireWrite();
+      const req = await db.reimbursements.get(id);
+      if (!req || req.status !== "awaiting_confirmation") {
+        throw new RepositoryError("not_found", "Reimbursement request not found.");
+      }
+      if (req.requesterId !== userId) {
+        throw new RepositoryError("forbidden", "You cannot reject this reimbursement.");
+      }
+      await db.reimbursements.update(id, { status: "pending" });
     },
 
     async saveReceipt(dataUrl) {

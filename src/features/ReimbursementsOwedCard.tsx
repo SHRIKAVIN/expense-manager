@@ -5,17 +5,17 @@ import { useToast } from "@/components/Toast";
 import { formatCurrency } from "@/lib/format";
 
 export function ReimbursementsOwedCard({ currency }: { currency: string }) {
-  const { reimbursementsToPay, completeReimbursement, can } = useAppData();
+  const { reimbursementsToPay, markReimbursementPaid, can } = useAppData();
   const { show } = useToast();
 
   if (reimbursementsToPay.length === 0) return null;
 
-  const handleComplete = async (id: string, name: string, amount: number) => {
+  const handleMarkPaid = async (id: string, name: string, amount: number) => {
     try {
-      await completeReimbursement(id);
-      show(`Marked ${formatCurrency(amount, currency)} paid to ${name}`);
+      await markReimbursementPaid(id);
+      show(`Marked ${formatCurrency(amount, currency)} paid to ${name} — waiting for their confirmation`);
     } catch (err) {
-      show(err instanceof Error ? err.message : "Could not mark reimbursement done");
+      show(err instanceof Error ? err.message : "Could not mark reimbursement paid");
     }
   };
 
@@ -24,7 +24,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
       <div>
         <p className="text-tagline text-ink">Reimbursements owed</p>
         <p className="text-caption text-ink-muted-48 mt-1">
-          Mark as paid once you&apos;ve reimbursed — the expense is removed from their account.
+          Mark as paid after you reimburse — they&apos;ll confirm before it&apos;s removed from
+          their account.
         </p>
       </div>
       {reimbursementsToPay.map((req) => (
@@ -44,7 +45,7 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
               variant="primary"
               className="shrink-0 px-4 py-2"
               data-testid={`reimbursement-mark-done-${req.id}`}
-              onClick={() => void handleComplete(req.id, req.requesterName, req.amount)}
+              onClick={() => void handleMarkPaid(req.id, req.requesterName, req.amount)}
             >
               Mark paid
             </Button>

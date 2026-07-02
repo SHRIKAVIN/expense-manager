@@ -76,7 +76,7 @@ export interface DbReimbursementRequest {
   requester_name: string;
   amount: number;
   merchant: string;
-  status: "pending" | "completed";
+  status: "pending" | "awaiting_confirmation" | "completed";
   created_at: string;
   completed_at: string | null;
 }

@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut, categorySliceStyle } from "@/features/CategoryDonut";
 import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
+import { ReimbursementsConfirmCard } from "@/features/ReimbursementsConfirmCard";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
@@ -182,6 +183,7 @@ export function DashboardScreen() {
       </div>
 
       <ReimbursementsOwedCard currency={currency} />
+      <ReimbursementsConfirmCard currency={currency} />
 
       {/* Upcoming recurring */}
       <AnimatePresence>

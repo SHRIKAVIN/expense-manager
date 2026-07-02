@@ -89,7 +89,7 @@ export interface ExpenseInput {
   };
 }
 
-export type ReimbursementStatus = "pending" | "completed";
+export type ReimbursementStatus = "pending" | "awaiting_confirmation" | "completed";
 
 export interface ReimbursementRequest {
   id: string;

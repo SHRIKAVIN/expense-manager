@@ -327,9 +327,21 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       return [...byId.values()].sort((a, b) => b.createdAt - a.createdAt);
     },
 
-    async completeReimbursement(id) {
+    async markReimbursementPaid(id) {
       requireWrite();
-      const { error } = await sb().rpc("complete_reimbursement", { request_id: id });
+      const { error } = await sb().rpc("mark_reimbursement_paid", { request_id: id });
+      if (error) throwDb(error.message);
+    },
+
+    async confirmReimbursement(id) {
+      requireWrite();
+      const { error } = await sb().rpc("confirm_reimbursement", { request_id: id });
+      if (error) throwDb(error.message);
+    },
+
+    async rejectReimbursementPaid(id) {
+      requireWrite();
+      const { error } = await sb().rpc("reject_reimbursement_paid", { request_id: id });
       if (error) throwDb(error.message);
     },
 

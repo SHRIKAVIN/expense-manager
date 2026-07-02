@@ -9,7 +9,7 @@ create table if not exists public.reimbursement_requests (
   requester_name text not null,
   amount numeric not null check (amount > 0),
   merchant text not null,
-  status text not null default 'pending' check (status in ('pending', 'completed')),
+  status text not null default 'pending' check (status in ('pending', 'awaiting_confirmation', 'completed')),
   created_at timestamptz not null default now(),
   completed_at timestamptz
 );
@@ -30,53 +30,6 @@ create policy "reimbursement_insert_requester" on public.reimbursement_requests 
   auth.uid() = requester_id
 );
 
-create or replace function public.complete_reimbursement(request_id uuid)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  req public.reimbursement_requests;
-  payer_email text;
-  exp_receipt uuid;
-begin
-  if auth.uid() is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  select email into payer_email from public.profiles where id = auth.uid();
-  if payer_email is null then
-    raise exception 'Profile not found';
-  end if;
-
-  select * into req from public.reimbursement_requests
-  where id = request_id and status = 'pending'
-  for update;
-
-  if not found then
-    raise exception 'Reimbursement request not found';
-  end if;
-
-  if lower(req.payer_email) <> lower(payer_email) then
-    raise exception 'Not authorized to complete this reimbursement';
-  end if;
-
-  select receipt_id into exp_receipt from public.expenses
-  where id = req.expense_id and user_id = req.requester_id;
-
-  if exp_receipt is not null then
-    delete from public.receipts where id = exp_receipt;
-  end if;
-
-  delete from public.expenses where id = req.expense_id and user_id = req.requester_id;
-
-  update public.reimbursement_requests
-  set status = 'completed', completed_at = now()
-  where id = request_id;
-end;
-$$;
-
-grant execute on function public.complete_reimbursement(uuid) to authenticated;
+-- See 20260702_reimbursement_confirmation.sql for mark/confirm/reject functions.
 
 notify pgrst, 'reload schema';

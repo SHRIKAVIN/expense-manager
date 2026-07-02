@@ -64,7 +64,11 @@ export function ExpenseRow({
           {category?.name ?? "Uncategorized"}
           {expense.paymentMethod ? ` · ${expense.paymentMethod}` : ""}
           {expense.recurringId ? " · recurring" : ""}
-          {pendingReimbursement ? ` · awaiting ${pendingReimbursement.payerName}` : ""}
+          {pendingReimbursement
+            ? pendingReimbursement.status === "awaiting_confirmation"
+              ? ` · ${pendingReimbursement.payerName} marked paid — confirm`
+              : ` · awaiting ${pendingReimbursement.payerName}`
+            : ""}
         </p>
         {showDate && (
           <p className="text-fine-print text-ink-muted-48 mt-0.5">{formatDate(expense.date)}</p>

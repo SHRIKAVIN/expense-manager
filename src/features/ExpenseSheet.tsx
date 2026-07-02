@@ -253,8 +253,8 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
             <span>
               <span className="text-body-strong text-ink block">Request reimbursement</span>
               <span className="text-caption text-ink-muted-48">
-                Ask {reimbursementPartner.name} to pay you back. Once marked paid, this expense
-                is removed from your account.
+                Ask {reimbursementPartner.name} to pay you back. After they mark paid, you
+                confirm receipt and the expense is removed.
               </span>
             </span>
           </label>
