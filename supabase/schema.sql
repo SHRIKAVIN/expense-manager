@@ -57,6 +57,7 @@ create table if not exists public.expenses (
   receipt_id uuid references public.receipts (id) on delete set null,
   recurring_id uuid references public.recurring (id) on delete set null,
   recurring_period text,
+  excluded_from_totals boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -90,11 +91,15 @@ create table if not exists public.reimbursement_requests (
   merchant text not null,
   status text not null default 'pending' check (status in ('pending', 'awaiting_confirmation', 'completed')),
   created_at timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  payer_expense_id uuid
 );
 
 create index if not exists idx_reimbursement_payer on public.reimbursement_requests (lower(payer_email), status);
 create index if not exists idx_reimbursement_requester on public.reimbursement_requests (requester_id, status);
+
+alter table public.expenses
+  add column if not exists reimbursement_request_id uuid references public.reimbursement_requests (id) on delete set null;
 
 -- Auto-create profile when a user signs up (reads metadata from signUp options.data)
 create or replace function public.handle_new_user()
@@ -204,6 +209,7 @@ declare
   payer_category_id uuid;
   requester_category_name text;
   new_receipt_id uuid;
+  new_payer_expense_id uuid;
   transfer_note text;
   now_ts timestamptz := now();
 begin
@@ -276,6 +282,7 @@ begin
     payment_method,
     notes,
     receipt_id,
+    reimbursement_request_id,
     created_at,
     updated_at
   )
@@ -291,19 +298,20 @@ begin
       else exp.notes || ' · ' || transfer_note
     end,
     new_receipt_id,
+    request_id,
     now_ts,
     now_ts
-  );
+  )
+  returning id into new_payer_expense_id;
 
-  if exp.receipt_id is not null then
-    delete from public.receipts where id = exp.receipt_id;
-  end if;
-
-  delete from public.expenses
+  update public.expenses
+  set excluded_from_totals = true, updated_at = now_ts
   where id = req.expense_id and user_id = req.requester_id;
 
   update public.reimbursement_requests
-  set status = 'completed', completed_at = now()
+  set status = 'completed',
+      completed_at = now_ts,
+      payer_expense_id = new_payer_expense_id
   where id = request_id;
 end;
 $$;

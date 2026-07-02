@@ -17,13 +17,13 @@ import type { Category } from "@/lib/types";
 export function BudgetsScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { categories, expenses, can, editCategory } = useAppData();
+  const { categories, expensesForTotals, can, editCategory } = useAppData();
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [limitText, setLimitText] = useState("");
 
-  const monthExpenses = useMemo(() => filterByMonth(expenses, currentMonthKey()), [expenses]);
+  const monthExpenses = useMemo(() => filterByMonth(expensesForTotals, currentMonthKey()), [expensesForTotals]);
   const active = categories.filter((c) => !c.archived);
   const withBudget = active.filter((c) => c.monthlyBudget && c.monthlyBudget > 0);
   const withoutBudget = active.filter((c) => !c.monthlyBudget || c.monthlyBudget <= 0);

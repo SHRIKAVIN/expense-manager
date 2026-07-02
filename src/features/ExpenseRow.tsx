@@ -6,6 +6,8 @@ import { useAppData } from "@/data/AppDataProvider";
 import type { Category, Expense } from "@/lib/types";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { Lightbox } from "@/components/Lightbox";
+import { cn } from "@/lib/cn";
+import { isReimbursementLogEntry, reimbursementLogTag } from "@/lib/reimbursementDisplay";
 
 interface ExpenseRowProps {
   expense: Expense;
@@ -15,6 +17,20 @@ interface ExpenseRowProps {
   onDelete: (e: Expense) => void;
   /** Show the expense date below the category line (e.g. on Dashboard recents). */
   showDate?: boolean;
+}
+
+function ReimbursedTag({ variant }: { variant: "received" | "paid" }) {
+  const isReceived = variant === "received";
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-bold leading-none",
+        isReceived ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700",
+      )}
+    >
+      Reimbursed
+    </span>
+  );
 }
 
 export function ExpenseRow({
@@ -27,10 +43,13 @@ export function ExpenseRow({
 }: ExpenseRowProps) {
   const { can, repo, reimbursementByExpenseId } = useAppData();
   const pendingReimbursement = reimbursementByExpenseId[expense.id];
+  const logTag = reimbursementLogTag(expense);
+  const isLogEntry = isReimbursementLogEntry(expense);
   const reduced = usePrefersReducedMotion();
   const x = useMotionValue(0);
   const revealOpacity = useTransform(x, [-80, -20], [1, 0]);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const canModify = can.writeExpenses && !isLogEntry;
 
   const openReceipt = async () => {
     if (!expense.receiptId) return;
@@ -59,7 +78,10 @@ export function ExpenseRow({
       )}
 
       <div className="min-w-0 flex-1">
-        <p className="text-body-strong text-ink truncate">{expense.merchant}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-body-strong text-ink truncate">{expense.merchant}</p>
+          {logTag && <ReimbursedTag variant={logTag} />}
+        </div>
         <p className="text-caption text-ink-muted-48 truncate">
           {category?.name ?? "Uncategorized"}
           {expense.paymentMethod ? ` · ${expense.paymentMethod}` : ""}
@@ -75,11 +97,18 @@ export function ExpenseRow({
         )}
       </div>
 
-      <span className="text-body-strong text-ink tabular-nums shrink-0">
+      <span
+        className={cn(
+          "text-body-strong tabular-nums shrink-0",
+          logTag === "received" && "text-emerald-700",
+          logTag === "paid" && "text-red-600",
+          !logTag && "text-ink",
+        )}
+      >
         −{formatCurrency(expense.amount, currency)}
       </span>
 
-      {can.writeExpenses && (
+      {canModify && (
         <div className="hidden lg:flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           <button
             type="button"
@@ -105,8 +134,7 @@ export function ExpenseRow({
   return (
     <>
       <div className="group relative overflow-hidden border-b border-divider-soft last:border-b-0">
-        {/* Swipe-to-delete reveal (mobile, write roles only) */}
-        {can.writeExpenses && (
+        {canModify && (
           <motion.div
             style={{ opacity: revealOpacity }}
             className="lg:hidden absolute inset-y-0 right-0 w-20 flex items-center justify-center text-ink-muted-48"
@@ -115,7 +143,7 @@ export function ExpenseRow({
           </motion.div>
         )}
 
-        {can.writeExpenses ? (
+        {canModify ? (
           <motion.div
             drag={reduced ? false : "x"}
             dragConstraints={{ left: -96, right: 0 }}
@@ -123,8 +151,6 @@ export function ExpenseRow({
             style={{ x }}
             onClick={() => onEdit(expense)}
             onDragEnd={(_, info) => {
-              // Swiping past the threshold requests deletion (confirmed by the
-              // parent's dialog); the row always springs back to rest.
               if (info.offset.x < -80) onDelete(expense);
               x.set(0);
             }}

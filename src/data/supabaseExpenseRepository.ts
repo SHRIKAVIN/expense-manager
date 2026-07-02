@@ -230,6 +230,14 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
 
     async updateExpense(id, patch) {
       requireWrite();
+      const existing = await this.getExpense(id);
+      if (!existing) throwDb("Expense not found.", "not_found");
+      if (existing.excludedFromTotals || existing.reimbursementRequestId) {
+        throwDb("Reimbursed expenses cannot be edited.", "forbidden");
+      }
+      if (existing.notes?.includes("Reimbursed from")) {
+        throwDb("Reimbursed expenses cannot be edited.", "forbidden");
+      }
       if (patch.amount !== undefined && !(patch.amount > 0)) {
         throwDb("Amount must be greater than 0.");
       }
@@ -289,12 +297,19 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const { data: exp, error: fetchErr } = await sb()
         .from("expenses")
-        .select("receipt_id")
+        .select("receipt_id, excluded_from_totals, reimbursement_request_id, notes")
         .eq("id", id)
         .eq("user_id", userId)
         .maybeSingle();
       if (fetchErr) throwDb(fetchErr.message);
       if (!exp) throwDb("Expense not found.", "not_found");
+      if (exp.excluded_from_totals || exp.reimbursement_request_id) {
+        throwDb("Reimbursed expenses cannot be deleted.", "forbidden");
+      }
+      const notes = exp.notes as string | null;
+      if (notes?.includes("Reimbursed from")) {
+        throwDb("Reimbursed expenses cannot be deleted.", "forbidden");
+      }
 
       const { error } = await sb().from("expenses").delete().eq("id", id).eq("user_id", userId);
       if (error) throwDb(error.message);

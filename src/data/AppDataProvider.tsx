@@ -14,6 +14,7 @@ import {
   writeWorkspaceCache,
 } from "@/lib/cache/userCache";
 import { formatCurrency } from "@/lib/format";
+import { expensesForTotals as filterExpensesForTotals } from "@/lib/analytics";
 import { notifyPush } from "@/lib/notifications";
 import {
   notifyPartnerExpenseAdded,
@@ -38,6 +39,8 @@ interface AppDataContextValue {
   repo: ExpenseRepository;
   categories: Category[];
   expenses: Expense[];
+  /** Expenses that count toward spent totals (excludes reimbursed requester entries). */
+  expensesForTotals: Expense[];
   income: IncomeEntry[];
   reimbursements: ReimbursementRequest[];
   /** Pending reimbursements the current user asked for (maps expense id → request). */
@@ -304,6 +307,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return map;
   }, [categories]);
 
+  const expensesForTotals = useMemo(
+    () => filterExpensesForTotals(expenses),
+    [expenses],
+  );
+
   const activeReimbursements = useMemo(
     () => reimbursements.filter((r) => r.status !== "completed"),
     [reimbursements],
@@ -351,6 +359,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       repo,
       categories,
       expenses,
+      expensesForTotals,
       income,
       reimbursements,
       reimbursementByExpenseId,
@@ -380,6 +389,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       repo,
       categories,
       expenses,
+      expensesForTotals,
       income,
       reimbursements,
       reimbursementByExpenseId,

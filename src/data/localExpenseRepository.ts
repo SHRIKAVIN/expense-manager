@@ -182,6 +182,12 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const exp = await db.expenses.get(id);
       if (!exp || exp.userId !== userId) throw new RepositoryError("not_found", "Expense not found.");
+      if (exp.excludedFromTotals || exp.reimbursementRequestId) {
+        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be edited.");
+      }
+      if (exp.notes?.includes("Reimbursed from")) {
+        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be edited.");
+      }
       if (patch.amount !== undefined && !(patch.amount > 0)) {
         throw new RepositoryError("validation", "Amount must be greater than 0.");
       }
@@ -224,6 +230,12 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const exp = await db.expenses.get(id);
       if (!exp || exp.userId !== userId) throw new RepositoryError("not_found", "Expense not found.");
+      if (exp.excludedFromTotals || exp.reimbursementRequestId) {
+        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be deleted.");
+      }
+      if (exp.notes?.includes("Reimbursed from")) {
+        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be deleted.");
+      }
       if (exp.receiptId) await db.receipts.delete(exp.receiptId);
       await db.expenses.delete(id);
     },
@@ -290,11 +302,66 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         throw new RepositoryError("forbidden", "You cannot confirm this reimbursement.");
       }
       const exp = await db.expenses.get(req.expenseId);
-      if (exp && exp.userId === req.requesterId) {
-        if (exp.receiptId) await db.receipts.delete(exp.receiptId);
-        await db.expenses.delete(exp.id);
+      if (!exp || exp.userId !== req.requesterId) {
+        throw new RepositoryError("not_found", "Expense not found.");
       }
-      await db.reimbursements.update(id, { status: "completed", completedAt: Date.now() });
+
+      const payer = await db.users
+        .filter((u) => u.email.toLowerCase() === req.payerEmail.toLowerCase())
+        .first();
+      if (!payer) throw new RepositoryError("not_found", "Payer profile not found.");
+
+      const requesterCategory = await db.categories.get(exp.categoryId);
+      const payerCategories = await db.categories.where("userId").equals(payer.id).toArray();
+      let payerCategoryId =
+        payerCategories.find(
+          (c) =>
+            !c.archived &&
+            requesterCategory &&
+            c.name.toLowerCase() === requesterCategory.name.toLowerCase(),
+        )?.id ??
+        payerCategories.find((c) => !c.archived && c.name.toLowerCase() === "other")?.id ??
+        payerCategories.find((c) => !c.archived)?.id;
+      if (!payerCategoryId) throw new RepositoryError("not_found", "Payer has no categories.");
+
+      let payerReceiptId: string | undefined;
+      if (exp.receiptId) {
+        const receipt = await db.receipts.get(exp.receiptId);
+        if (receipt) {
+          const copied: Receipt = {
+            id: uid("rcpt"),
+            userId: payer.id,
+            dataUrl: receipt.dataUrl,
+            createdAt: Date.now(),
+          };
+          await db.receipts.add(copied);
+          payerReceiptId = copied.id;
+        }
+      }
+
+      const transferNote = `Reimbursed from ${req.requesterName}`;
+      const now = Date.now();
+      const payerExpense: Expense = {
+        id: uid("exp"),
+        userId: payer.id,
+        amount: exp.amount,
+        merchant: exp.merchant,
+        categoryId: payerCategoryId,
+        date: exp.date,
+        paymentMethod: exp.paymentMethod,
+        notes: exp.notes?.trim() ? `${exp.notes} · ${transferNote}` : transferNote,
+        receiptId: payerReceiptId,
+        reimbursementRequestId: id,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await db.expenses.add(payerExpense);
+      await db.expenses.update(exp.id, { excludedFromTotals: true, updatedAt: now });
+      await db.reimbursements.update(id, {
+        status: "completed",
+        completedAt: now,
+        payerExpenseId: payerExpense.id,
+      });
     },
 
     async rejectReimbursementPaid(id) {

@@ -8,7 +8,7 @@ interface SummaryStatCardProps {
   "data-testid"?: string;
 }
 
-/** Compact stat tile for dashboard-style 2–3 column grids. */
+/** Elevated stat tile for dashboard summary grids. */
 export function SummaryStatCard({
   label,
   children,
@@ -19,13 +19,14 @@ export function SummaryStatCard({
     <div
       data-testid={testId}
       className={cn(
-        "flex min-h-[5.5rem] flex-col justify-between rounded-xl border border-hairline bg-canvas px-3 py-3.5",
-        "shadow-[0_1px_2px_rgba(0,0,0,0.04)] sm:min-h-[6rem] sm:px-4 sm:py-4",
+        "flex flex-col justify-start gap-1 rounded-2xl bg-canvas px-3 py-3 sm:px-4 sm:py-3.5",
+        "shadow-[0_6px_20px_rgba(0,0,0,0.1),0_2px_8px_rgba(0,0,0,0.06)]",
+        "dark:shadow-[0_6px_20px_rgba(0,0,0,0.4),0_2px_8px_rgba(0,0,0,0.25)]",
         className,
       )}
     >
-      <p className="text-[11px] font-medium leading-snug text-ink-muted-48 sm:text-caption">{label}</p>
-      <div className="mt-2 min-w-0 text-[13px] font-semibold tabular-nums leading-tight sm:text-[15px]">
+      <p className="text-[11px] font-bold leading-snug text-ink-muted-48 sm:text-[13px]">{label}</p>
+      <div className="min-w-0 text-[15px] font-bold tabular-nums leading-none tracking-tight sm:text-[22px] lg:text-[26px]">
         {children}
       </div>
     </div>

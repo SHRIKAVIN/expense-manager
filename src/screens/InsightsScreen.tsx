@@ -39,21 +39,24 @@ const RANGE_SEGMENTS: Segment<Range>[] = [
 export function InsightsScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, categoriesById } = useAppData();
+  const { expenses, expensesForTotals, categoriesById } = useAppData();
   const [range, setRange] = useState<Range>("month");
 
   const trend = useMemo(() => {
-    if (range === "week") return weeklyTrend(expenses);
-    if (range === "year") return yearlyTrend(expenses);
-    return monthlyTrend(expenses);
-  }, [expenses, range]);
+    if (range === "week") return weeklyTrend(expensesForTotals);
+    if (range === "year") return yearlyTrend(expensesForTotals);
+    return monthlyTrend(expensesForTotals);
+  }, [expensesForTotals, range]);
 
-  const monthExpenses = useMemo(() => filterByMonth(expenses, currentMonthKey()), [expenses]);
+  const monthExpenses = useMemo(
+    () => filterByMonth(expensesForTotals, currentMonthKey()),
+    [expensesForTotals],
+  );
   const categoryBars = useMemo(
     () => spendByCategory(monthExpenses, categoriesById),
     [monthExpenses, categoriesById],
   );
-  const mom = useMemo(() => monthOverMonth(expenses), [expenses]);
+  const mom = useMemo(() => monthOverMonth(expensesForTotals), [expensesForTotals]);
   const momDelta = mom.current - mom.previous;
   const momPct = mom.previous > 0 ? (momDelta / mom.previous) * 100 : 0;
 

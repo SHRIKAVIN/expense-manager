@@ -34,6 +34,8 @@ export interface DbExpense {
   receipt_id: string | null;
   recurring_id: string | null;
   recurring_period: string | null;
+  excluded_from_totals: boolean;
+  reimbursement_request_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,4 +81,5 @@ export interface DbReimbursementRequest {
   status: "pending" | "awaiting_confirmation" | "completed";
   created_at: string;
   completed_at: string | null;
+  payer_expense_id: string | null;
 }

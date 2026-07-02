@@ -5,6 +5,11 @@ export function sum(expenses: Expense[]): number {
   return expenses.reduce((acc, e) => acc + e.amount, 0);
 }
 
+/** Expenses that count toward spent totals, donut, budgets, and insights. */
+export function expensesForTotals(expenses: Expense[]): Expense[] {
+  return expenses.filter((e) => !e.excludedFromTotals);
+}
+
 export function sumIncome(entries: IncomeEntry[], month?: string): number {
   return entries
     .filter((e) => !month || e.month === month)

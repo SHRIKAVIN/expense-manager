@@ -37,7 +37,8 @@ import { listItemVariants } from "@/lib/motion";
 export function DashboardScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, income, categories, categoriesById, recurring, removeExpense, refresh } = useAppData();
+  const { expenses, expensesForTotals, income, categories, categoriesById, recurring, removeExpense, refresh } =
+    useAppData();
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Expense | null>(null);
@@ -83,12 +84,16 @@ export function DashboardScreen() {
     () => filterByMonth(expenses, selectedMonth),
     [expenses, selectedMonth],
   );
-  const totalSpent = useMemo(() => sum(monthExpenses), [monthExpenses]);
+  const monthExpensesForTotals = useMemo(
+    () => filterByMonth(expensesForTotals, selectedMonth),
+    [expensesForTotals, selectedMonth],
+  );
+  const totalSpent = useMemo(() => sum(monthExpensesForTotals), [monthExpensesForTotals]);
   const monthIncomeTotal = useMemo(() => sumIncome(income, selectedMonth), [income, selectedMonth]);
   const netRemaining = monthIncomeTotal - totalSpent;
   const slices = useMemo(
-    () => spendByCategory(monthExpenses, categoriesById),
-    [monthExpenses, categoriesById],
+    () => spendByCategory(monthExpensesForTotals, categoriesById),
+    [monthExpensesForTotals, categoriesById],
   );
   const recent = useMemo(
     () =>
@@ -105,11 +110,11 @@ export function DashboardScreen() {
   const budgetTotals = useMemo(() => {
     const totalLimit = budgeted.reduce((a, c) => a + (c.monthlyBudget ?? 0), 0);
     const totalSpentBudgeted = budgeted.reduce(
-      (a, c) => a + sum(monthExpenses.filter((e) => e.categoryId === c.id)),
+      (a, c) => a + sum(monthExpensesForTotals.filter((e) => e.categoryId === c.id)),
       0,
     );
     return { totalLimit, totalSpentBudgeted };
-  }, [budgeted, monthExpenses]);
+  }, [budgeted, monthExpensesForTotals]);
 
   const upcoming = useMemo(() => {
     return recurring

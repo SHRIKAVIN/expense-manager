@@ -55,6 +55,8 @@ export function toExpense(row: DbExpense): Expense {
     receiptId: row.receipt_id ?? undefined,
     recurringId: row.recurring_id ?? undefined,
     recurringPeriod: row.recurring_period ?? undefined,
+    excludedFromTotals: row.excluded_from_totals ?? false,
+    reimbursementRequestId: row.reimbursement_request_id ?? undefined,
     createdAt: new Date(row.created_at).getTime(),
     updatedAt: new Date(row.updated_at).getTime(),
   };
@@ -108,5 +110,6 @@ export function toReimbursement(row: DbReimbursementRequest): ReimbursementReque
     status: row.status,
     createdAt: new Date(row.created_at).getTime(),
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
+    payerExpenseId: row.payer_expense_id ?? undefined,
   };
 }

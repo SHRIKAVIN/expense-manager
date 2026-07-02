@@ -47,6 +47,10 @@ export interface Expense {
   recurringId?: string;
   /** Period key used for idempotent recurring generation (e.g. 2026-06). */
   recurringPeriod?: string;
+  /** Set when this expense was reimbursed and should stay in logs but not count toward totals. */
+  excludedFromTotals?: boolean;
+  /** Set on payer-side expenses created from a confirmed reimbursement. */
+  reimbursementRequestId?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -105,6 +109,8 @@ export interface ReimbursementRequest {
   status: ReimbursementStatus;
   createdAt: number;
   completedAt?: number;
+  /** Expense id on the payer's account after confirmation. */
+  payerExpenseId?: string;
 }
 
 /** Monthly income entry — multiple rows per month are summed on the dashboard. */
