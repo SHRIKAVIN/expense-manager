@@ -189,9 +189,13 @@ html.ios.pwa-standalone {
 }
 
 .auth-screen-inner {
-  min-height: 100%;
-  padding-top: max(2rem, env(safe-area-inset-top, 0px));
-  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
   padding-left: max(1.25rem, env(safe-area-inset-left, 0px));
   padding-right: max(1.25rem, env(safe-area-inset-right, 0px));
 }

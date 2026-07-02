@@ -127,7 +127,7 @@ export function ExpenseRow({
           "text-body-strong tabular-nums shrink-0",
           logTag === "received" && "text-emerald-700",
           logTag === "paid" && "text-red-600",
-          !logTag && "text-ink",
+          !logTag && "text-red-600",
         )}
       >
         −{formatCurrency(expense.amount, currency)}

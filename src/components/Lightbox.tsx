@@ -178,7 +178,7 @@ function ZoomableImage({ src }: { src: string }) {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="max-h-full max-w-full select-none rounded-sm object-contain shadow-product"
+        className="max-h-[min(58dvh,520px)] max-w-[min(92vw,520px)] select-none rounded-sm object-contain shadow-product"
         style={{
           transform: `translate(${x}px, ${y}px) scale(${scale})`,
           cursor: scale > 1 ? "grab" : "zoom-in",
@@ -200,7 +200,7 @@ export function Lightbox({ src, onClose }: LightboxProps) {
     <AnimatePresence>
       {src && (
         <motion.div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-6"
+          className="fixed inset-0 z-[70] flex flex-col items-center justify-end pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-14 px-4 sm:justify-center sm:pb-6 sm:p-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -215,17 +215,20 @@ export function Lightbox({ src, onClose }: LightboxProps) {
             transition={{ duration: reduced ? 0 : 0.2 }}
             onClick={onClose}
           />
+          <div className="relative z-10 flex w-full max-w-lg flex-1 min-h-0 flex-col items-center justify-center sm:max-h-[72dvh]">
+            <div className="relative h-full w-full max-h-[58dvh] sm:max-h-[65dvh]">
+              <ZoomableImage src={src} />
+            </div>
+          </div>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            className="absolute top-6 right-6 z-20 h-11 w-11 rounded-full bg-chip-translucent backdrop-blur flex items-center justify-center text-ink outline-none"
+            className="relative z-20 mt-4 h-12 min-w-[7.5rem] rounded-pill bg-chip-translucent px-6 backdrop-blur flex items-center justify-center gap-2 text-body-strong text-ink outline-none sm:absolute sm:bottom-6 sm:right-6 sm:mt-0 sm:h-11 sm:min-w-0 sm:w-11 sm:rounded-full sm:px-0"
           >
             <CloseIcon size={22} />
+            <span className="sm:hidden">Close</span>
           </button>
-          <div className="relative z-10 h-full w-full max-h-[85dvh] max-w-4xl">
-            <ZoomableImage src={src} />
-          </div>
         </motion.div>
       )}
     </AnimatePresence>,

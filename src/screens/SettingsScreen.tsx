@@ -17,6 +17,10 @@ import {
   requestNotificationPermission,
 } from "@/lib/notifications";
 import {
+  loadNotificationPrefsFromDb,
+  syncRecurringRemindersEnabled,
+} from "@/lib/notificationPrefs";
+import {
   partnerAlertsEnabled,
   setPartnerAlertsEnabled,
 } from "@/lib/partnerNotify";
@@ -91,13 +95,23 @@ export function SettingsScreen() {
 
   const remindersKey = user ? `em.reminders.${user.id}` : "em.reminders";
   useEffect(() => {
-    setRemindersOn(localStorage.getItem(remindersKey) === "1");
-  }, [remindersKey]);
-
-  useEffect(() => {
     if (!user?.id) return;
-    setPartnerAlertsOn(partnerAlertsEnabled(user.id));
-  }, [user?.id]);
+    void (async () => {
+      const db = await loadNotificationPrefsFromDb(user.id);
+      if (db.recurringReminders) {
+        localStorage.setItem(remindersKey, "1");
+        setRemindersOn(true);
+      } else {
+        setRemindersOn(localStorage.getItem(remindersKey) === "1");
+      }
+      if (db.partnerAlerts) {
+        setPartnerAlertsEnabled(user.id, true);
+        setPartnerAlertsOn(true);
+      } else {
+        setPartnerAlertsOn(partnerAlertsEnabled(user.id));
+      }
+    })();
+  }, [remindersKey, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !partnerAlertsOn) {
@@ -130,19 +144,31 @@ export function SettingsScreen() {
   };
 
   const toggleReminders = async () => {
+    if (!user) return;
     if (!remindersOn) {
       const p = await requestNotificationPermission();
       setPerm(p);
       if (p === "granted") {
         localStorage.setItem(remindersKey, "1");
         setRemindersOn(true);
-        show("Reminders on");
+        await syncRecurringRemindersEnabled(user.id, true);
+        if (webPushSupported()) {
+          try {
+            await registerWebPushSubscription(user.id);
+            show("Reminders on — background alerts enabled");
+          } catch (err) {
+            show(err instanceof Error ? err.message : "Reminders on — open app for alerts until push registers");
+          }
+        } else {
+          show("Reminders on — add VAPID keys and install the app for background alerts");
+        }
       } else {
         show("Notification permission denied");
       }
     } else {
       localStorage.removeItem(remindersKey);
       setRemindersOn(false);
+      await syncRecurringRemindersEnabled(user.id, false);
       show("Reminders off");
     }
   };
@@ -449,7 +475,7 @@ export function SettingsScreen() {
                 <p className="text-caption text-ink-muted-48">
                   {perm === "unsupported"
                     ? "Not supported on this device"
-                    : "Get notified before recurring expenses are due"}
+                    : "Push 0–2 days before due (daily check + while app is open). Install the app and allow notifications."}
                 </p>
               </div>
               <Button
@@ -460,6 +486,15 @@ export function SettingsScreen() {
                 {remindersOn ? "On" : "Enable"}
               </Button>
             </div>
+            {showPartnerAlerts && !isQuickSwitchViewOnly && (
+              <div className="px-5 py-4 border-b border-divider-soft">
+                <p className="text-body text-ink">Budget alerts</p>
+                <p className="text-caption text-ink-muted-48 mt-1">
+                  Push when a category hits 90% of budget or goes over (also while the app is open).
+                  With partner alerts on, your partner is notified too.
+                </p>
+              </div>
+            )}
             {showPartnerAlerts && !isQuickSwitchViewOnly && (
               <div className="flex flex-col gap-3 px-5 py-4">
                 <div className="flex items-center justify-between gap-4">

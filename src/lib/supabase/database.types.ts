@@ -9,6 +9,8 @@ export interface DbProfile {
   role: DbRole;
   currency: string;
   theme_preference: DbThemePreference;
+  recurring_reminders_enabled: boolean;
+  partner_alerts_enabled: boolean;
   created_at: string;
 }
 

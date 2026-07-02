@@ -1,5 +1,6 @@
 import { getReimbursementPartner, isQuickSwitchEmail } from "@/auth/quickSwitch";
 import { formatCurrency } from "@/lib/format";
+import { syncPartnerAlertsEnabledDb } from "@/lib/notificationPrefs";
 import { isSupabaseEnabled, getSupabase } from "@/lib/supabase/client";
 import type { Expense, ReimbursementRequest, SessionUser } from "@/lib/types";
 
@@ -8,7 +9,8 @@ export type PartnerNotificationKind =
   | "reimbursement_requested"
   | "reimbursement_marked_paid"
   | "reimbursement_confirmed"
-  | "reimbursement_rejected";
+  | "reimbursement_rejected"
+  | "budget_alert";
 
 const PARTNER_ALERTS_KEY = "em.partnerAlerts";
 
@@ -27,6 +29,7 @@ export function setPartnerAlertsEnabled(userId: string, enabled: boolean): void 
   } catch {
     /* no-op */
   }
+  void syncPartnerAlertsEnabledDb(userId, enabled);
 }
 
 async function sendPartnerNotification(input: {
@@ -143,5 +146,38 @@ export async function notifyPartnerReimbursementRejected(
     title: `${name} has not received payment yet`,
     body: `${amount} for ${req.merchant} — please pay again when ready`,
     kind: "reimbursement_rejected",
+  });
+}
+
+export async function notifyPartnerBudgetAlert(
+  user: SessionUser,
+  categoryName: string,
+  spent: number,
+  limit: number,
+  state: "full" | "exceeded",
+) {
+  const partner = partnerFor(user);
+  if (!partner) return;
+  const name = actorName(user);
+  const spentStr = formatCurrency(spent, user.currency);
+  const limitStr = formatCurrency(limit, user.currency);
+
+  if (state === "exceeded") {
+    await sendPartnerNotification({
+      recipientEmail: partner.email,
+      actorName: name,
+      title: `${name} exceeded a budget`,
+      body: `${categoryName}: ${spentStr} of ${limitStr}`,
+      kind: "budget_alert",
+    });
+    return;
+  }
+
+  await sendPartnerNotification({
+    recipientEmail: partner.email,
+    actorName: name,
+    title: `${name}'s budget is almost full`,
+    body: `${categoryName}: ${spentStr} of ${limitStr}`,
+    kind: "budget_alert",
   });
 }

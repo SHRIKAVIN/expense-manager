@@ -14,6 +14,10 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut, categorySliceStyle } from "@/features/CategoryDonut";
 import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
 import { ReimbursementsConfirmCard } from "@/features/ReimbursementsConfirmCard";
+import {
+  DashboardSummarySheet,
+  type DashboardSummaryKind,
+} from "@/features/DashboardSummarySheet";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
@@ -46,6 +50,7 @@ export function DashboardScreen() {
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [refreshing, setRefreshing] = useState(false);
+  const [summaryKind, setSummaryKind] = useState<DashboardSummaryKind | null>(null);
 
   const minMonth = useMemo(() => {
     if (expenses.length === 0) return undefined;
@@ -107,14 +112,27 @@ export function DashboardScreen() {
     () => categories.filter((c) => !c.archived && c.monthlyBudget && c.monthlyBudget > 0),
     [categories],
   );
+  const budgetSpentByCategory = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const c of budgeted) {
+      map[c.id] = sum(monthExpensesForTotals.filter((e) => e.categoryId === c.id));
+    }
+    return map;
+  }, [budgeted, monthExpensesForTotals]);
+
+  const monthIncomeEntries = useMemo(
+    () => income.filter((e) => e.month === selectedMonth),
+    [income, selectedMonth],
+  );
+
   const budgetTotals = useMemo(() => {
     const totalLimit = budgeted.reduce((a, c) => a + (c.monthlyBudget ?? 0), 0);
     const totalSpentBudgeted = budgeted.reduce(
-      (a, c) => a + sum(monthExpensesForTotals.filter((e) => e.categoryId === c.id)),
+      (a, c) => a + (budgetSpentByCategory[c.id] ?? 0),
       0,
     );
     return { totalLimit, totalSpentBudgeted };
-  }, [budgeted, monthExpensesForTotals]);
+  }, [budgeted, budgetSpentByCategory]);
 
   const upcoming = useMemo(() => {
     return recurring
@@ -168,14 +186,22 @@ export function DashboardScreen() {
         </Button>
       </div>
       <div className="mb-6 grid grid-cols-3 gap-2 sm:gap-3" data-testid="dashboard-summary">
-        <SummaryStatCard label="Income" data-testid="dashboard-summary-income">
+        <SummaryStatCard
+          label="Income"
+          data-testid="dashboard-summary-income"
+          onPress={() => setSummaryKind("income")}
+        >
           <CountUp
             value={monthIncomeTotal}
             currency={currency}
             className="text-primary"
           />
         </SummaryStatCard>
-        <SummaryStatCard label="Spent" data-testid="dashboard-summary-spent">
+        <SummaryStatCard
+          label="Spent"
+          data-testid="dashboard-summary-spent"
+          onPress={() => setSummaryKind("spent")}
+        >
           <CountUp value={totalSpent} currency={currency} className="text-amber-700" />
         </SummaryStatCard>
         <SummaryStatCard label="Remaining" data-testid="dashboard-summary-remaining">
@@ -270,7 +296,7 @@ export function DashboardScreen() {
 
           {/* Budget health */}
           {budgeted.length > 0 && (
-            <Card data-testid="dashboard-budget">
+            <Card data-testid="dashboard-budget" onPress={() => setSummaryKind("budget")}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-tagline text-ink">Budget health</p>
                 {budgetTotals.totalSpentBudgeted > budgetTotals.totalLimit && (
@@ -330,6 +356,20 @@ export function DashboardScreen() {
         confirmLabel="Delete"
         onConfirm={confirmDelete}
         onClose={() => setConfirmTarget(null)}
+      />
+      <DashboardSummarySheet
+        kind={summaryKind}
+        onClose={() => setSummaryKind(null)}
+        monthLabel={monthLabel(selectedMonth)}
+        currency={currency}
+        incomeEntries={monthIncomeEntries}
+        incomeTotal={monthIncomeTotal}
+        spentTotal={totalSpent}
+        expenseCount={monthExpensesForTotals.length}
+        slices={slices}
+        budgeted={budgeted}
+        budgetSpentByCategory={budgetSpentByCategory}
+        budgetTotals={budgetTotals}
       />
     </Screen>
   );
