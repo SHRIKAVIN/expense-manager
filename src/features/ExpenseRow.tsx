@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { CategoryGlyph, EditIcon, TrashIcon } from "@/lib/icons";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { useAppData } from "@/data/AppDataProvider";
@@ -15,6 +15,8 @@ interface ExpenseRowProps {
   currency: string;
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
+  /** True while the delete confirmation dialog is open for this row. */
+  deletePending?: boolean;
   /** Show the expense date below the category line (e.g. on Dashboard recents). */
   showDate?: boolean;
 }
@@ -39,6 +41,7 @@ export function ExpenseRow({
   currency,
   onEdit,
   onDelete,
+  deletePending = false,
   showDate,
 }: ExpenseRowProps) {
   const { can, repo, reimbursementByExpenseId } = useAppData();
@@ -51,6 +54,27 @@ export function ExpenseRow({
   const [lightbox, setLightbox] = useState<string | null>(null);
   const canWrite = can.writeExpenses;
   const canEdit = canWrite && !isLogEntry;
+  const wasDeletePending = useRef(false);
+
+  const resetSwipe = () => {
+    void animate(x, 0, { type: "spring", stiffness: 500, damping: 40 });
+  };
+
+  useEffect(() => {
+    if (wasDeletePending.current && !deletePending) {
+      resetSwipe();
+    }
+    wasDeletePending.current = deletePending;
+  }, [deletePending, x]);
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+    if (info.offset.x < -80) {
+      onDelete(expense);
+      x.set(Math.min(info.offset.x, -80));
+      return;
+    }
+    resetSwipe();
+  };
 
   const openReceipt = async () => {
     if (!expense.receiptId) return;
@@ -153,10 +177,7 @@ export function ExpenseRow({
             dragElastic={0.1}
             style={{ x }}
             onClick={() => onEdit(expense)}
-            onDragEnd={(_, info) => {
-              if (info.offset.x < -80) onDelete(expense);
-              x.set(0);
-            }}
+            onDragEnd={handleDragEnd}
             className="cursor-pointer bg-canvas lg:cursor-default"
           >
             {rowInner}
@@ -167,10 +188,7 @@ export function ExpenseRow({
             dragConstraints={{ left: -96, right: 0 }}
             dragElastic={0.1}
             style={{ x }}
-            onDragEnd={(_, info) => {
-              if (info.offset.x < -80) onDelete(expense);
-              x.set(0);
-            }}
+            onDragEnd={handleDragEnd}
             className="bg-canvas"
           >
             {rowInner}

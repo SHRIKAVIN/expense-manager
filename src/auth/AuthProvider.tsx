@@ -213,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (patch: Partial<Pick<User, "displayName" | "currency">>) => {
       if (!user || !isSupabaseEnabled()) return;
       if (isQuickSwitchViewOnly(user.email)) {
-        throw new Error("Read-only while viewing your partner's account.");
+        throw new Error("View only.");
       }
       const updates: Record<string, string> = {};
       if (patch.displayName !== undefined) updates.display_name = patch.displayName.trim();
@@ -235,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (pref: ThemePreference) => {
       if (!user || !isSupabaseEnabled()) return;
       if (isQuickSwitchViewOnly(user.email)) {
-        throw new Error("Read-only while viewing your partner's account.");
+        throw new Error("View only.");
       }
       const { data, error } = await getSupabase()
         .from("profiles")

@@ -217,6 +217,7 @@ export function TransactionsScreen() {
                         currency={currency}
                         onEdit={setEditing}
                         onDelete={(e) => setConfirmTarget(e)}
+                        deletePending={confirmTarget?.id === e.id}
                       />
                     </motion.div>
                   ))}

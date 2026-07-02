@@ -299,8 +299,7 @@ export function SettingsScreen() {
           <Section title="Switch user">
             <Card className="flex flex-col gap-3" data-testid="settings-quick-switch">
               <p className="text-caption text-ink-muted-48">
-                Switch to your partner&apos;s account to view their expenses (read-only). Your own
-                account keeps full edit access.
+                Switch accounts to view your partner&apos;s expenses.
               </p>
               {quickSwitchUsers.map((account) => {
                 const active = user?.email.toLowerCase() === account.email;
@@ -317,7 +316,7 @@ export function SettingsScreen() {
                     {isHome
                       ? `Active: ${account.name}`
                       : active
-                        ? `Viewing: ${account.name} (read-only)`
+                        ? `Viewing: ${account.name}`
                         : `View ${account.name}'s account`}
                   </Button>
                 );

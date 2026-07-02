@@ -309,6 +309,7 @@ export function DashboardScreen() {
                   currency={currency}
                   onEdit={setEditing}
                   onDelete={(e) => setConfirmTarget(e)}
+                  deletePending={confirmTarget?.id === e.id}
                   showDate
                 />
               ))}

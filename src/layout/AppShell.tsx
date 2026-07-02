@@ -7,11 +7,13 @@ import { Fab } from "@/components/Fab";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { IncomeSheet } from "@/features/IncomeSheet";
 import { useAppData } from "@/data/AppDataProvider";
+import { useAuth } from "@/auth/AuthProvider";
+import { getQuickSwitchAccountName } from "@/auth/quickSwitch";
 import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { usePrefersReducedMotion } from "@/lib/motion";
+import { useToast } from "@/components/Toast";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
-import { QuickSwitchViewOnlyBanner } from "@/features/QuickSwitchViewOnlyBanner";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -19,12 +21,15 @@ const INCOME_FAB_ROUTE = "/income";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAppData();
+  const { isQuickSwitchViewOnly, user } = useAuth();
+  const { show } = useToast();
   const location = useLocation();
   const reduced = usePrefersReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<HTMLElement>(null);
+  const viewOnlyToastFor = useRef<string | null>(null);
   const showExpenseFab = can.writeExpenses && EXPENSE_FAB_ROUTES.includes(location.pathname);
   const showIncomeFab = can.writeExpenses && location.pathname === INCOME_FAB_ROUTE;
   const showFab = showExpenseFab || showIncomeFab;
@@ -33,6 +38,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     scrollRef.current?.scrollTo({ top: 0 });
     setScrolled(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (isQuickSwitchViewOnly && user?.email) {
+      if (viewOnlyToastFor.current !== user.email) {
+        const name = getQuickSwitchAccountName(user.email) ?? user.displayName;
+        show(`View only · ${name}`);
+        viewOnlyToastFor.current = user.email;
+      }
+      return;
+    }
+    viewOnlyToastFor.current = null;
+  }, [isQuickSwitchViewOnly, user?.displayName, user?.email, show]);
 
   return (
     <ScrolledContext.Provider value={scrolled}>
@@ -68,7 +85,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           >
             <AppHeader />
-            <QuickSwitchViewOnlyBanner />
             <motion.div
               key={location.pathname}
               initial={reduced ? false : { opacity: 0 }}
