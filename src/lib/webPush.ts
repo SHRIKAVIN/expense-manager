@@ -32,11 +32,29 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return arr;
 }
 
+function waitForServiceWorker(timeoutMs = 15000): Promise<ServiceWorkerRegistration> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => {
+      reject(new Error("Service worker did not load — refresh and try again."));
+    }, timeoutMs);
+
+    void navigator.serviceWorker.ready
+      .then((reg) => {
+        window.clearTimeout(timer);
+        resolve(reg);
+      })
+      .catch((err) => {
+        window.clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error("Service worker unavailable."));
+      });
+  });
+}
+
 /** Subscribe this device for Web Push (VAPID) and persist in Supabase. */
 export async function registerWebPushSubscription(userId: string): Promise<void> {
   if (!isSupabaseEnabled()) throw new Error("Supabase is not configured.");
   if (!webPushSupported()) {
-    throw new Error("Web Push is not available — check VITE_VAPID_PUBLIC_KEY and rebuild.");
+    throw new Error("Web Push is not available — check VITE_VAPID_PUBLIC_KEY and redeploy.");
   }
   if (Notification.permission !== "granted") {
     throw new Error("Notification permission not granted.");
@@ -49,11 +67,10 @@ export async function registerWebPushSubscription(userId: string): Promise<void>
     );
   }
 
-  let reg = await navigator.serviceWorker.getRegistration();
-  if (!reg) {
-    reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+  if (!navigator.serviceWorker.controller) {
+    await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
   }
-  reg = await navigator.serviceWorker.ready;
+  const reg = await waitForServiceWorker();
 
   let sub = await reg.pushManager.getSubscription();
 
@@ -149,6 +166,19 @@ export async function invokePartnerWebPush(input: {
   }
 }
 
+/** Whether the browser has an active push subscription on this device. */
+export async function hasLocalPushSubscription(): Promise<boolean> {
+  if (!webPushSupported()) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return false;
+    const sub = await reg.pushManager.getSubscription();
+    return Boolean(sub);
+  } catch {
+    return false;
+  }
+}
+
 /** Whether this user has at least one push subscription saved in Supabase. */
 export async function hasPushSubscription(userId: string): Promise<boolean> {
   if (!isSupabaseEnabled()) return false;
@@ -158,6 +188,22 @@ export async function hasPushSubscription(userId: string): Promise<boolean> {
     .eq("user_id", userId);
   if (error) return false;
   return (count ?? 0) > 0;
+}
+
+export type PushSetupStatus = "ready" | "needs_enable" | "needs_permission" | "needs_pwa" | "needs_vapid" | "needs_register";
+
+export async function getPushSetupStatus(
+  userId: string,
+  alertsEnabled: boolean,
+): Promise<PushSetupStatus> {
+  if (!alertsEnabled) return "needs_enable";
+  if (!vapidConfigured()) return "needs_vapid";
+  if (Notification.permission !== "granted") return "needs_permission";
+  const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isIos && !isStandalonePwa()) return "needs_pwa";
+  const [local, remote] = await Promise.all([hasLocalPushSubscription(), hasPushSubscription(userId)]);
+  if (local && remote) return "ready";
+  return "needs_register";
 }
 
 /** Send a test background push to the current user (verifies Edge Function + VAPID). */

@@ -58,8 +58,8 @@ export function PartnerNotificationListener() {
     const sb = getSupabase();
 
     if (Notification.permission === "granted" && webPushSupported()) {
-      void registerWebPushSubscription(user.id).catch(() => {
-        /* subscription optional */
+      void registerWebPushSubscription(user.id).catch((err) => {
+        console.warn("Push subscription failed:", err);
       });
     }
 

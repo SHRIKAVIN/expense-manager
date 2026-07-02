@@ -21,11 +21,12 @@ import {
   setPartnerAlertsEnabled,
 } from "@/lib/partnerNotify";
 import {
-  hasPushSubscription,
+  getPushSetupStatus,
   isStandalonePwa,
   registerWebPushSubscription,
   sendTestBackgroundPush,
   unregisterWebPushSubscription,
+  type PushSetupStatus,
   vapidConfigured,
   webPushSupported,
 } from "@/lib/webPush";
@@ -69,7 +70,7 @@ export function SettingsScreen() {
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
-  const [pushRegistered, setPushRegistered] = useState<boolean | null>(null);
+  const [pushStatus, setPushStatus] = useState<PushSetupStatus | null>(null);
   const [testingPush, setTestingPush] = useState(false);
   const showPartnerAlerts = Boolean(user?.email && isQuickSwitchEmail(user.email));
 
@@ -94,15 +95,27 @@ export function SettingsScreen() {
   }, [remindersKey]);
 
   useEffect(() => {
-    if (user?.id) setPartnerAlertsOn(partnerAlertsEnabled(user.id));
+    if (!user?.id) return;
+    setPartnerAlertsOn(partnerAlertsEnabled(user.id));
   }, [user?.id]);
 
   useEffect(() => {
-    if (!user?.id || !partnerAlertsOn || !webPushSupported()) {
-      setPushRegistered(null);
+    if (!user?.id || !partnerAlertsOn) {
+      setPushStatus(null);
       return;
     }
-    void hasPushSubscription(user.id).then(setPushRegistered);
+    void (async () => {
+      const status = await getPushSetupStatus(user.id, partnerAlertsOn);
+      setPushStatus(status);
+      if (status === "needs_register" && webPushSupported() && Notification.permission === "granted") {
+        try {
+          await registerWebPushSubscription(user.id);
+          setPushStatus(await getPushSetupStatus(user.id, true));
+        } catch {
+          /* user can tap Test background push for error details */
+        }
+      }
+    })();
   }, [user?.id, partnerAlertsOn]);
 
   useEffect(() => {
@@ -145,15 +158,15 @@ export function SettingsScreen() {
         if (webPushSupported()) {
           try {
             await registerWebPushSubscription(user.id);
-            const registered = await hasPushSubscription(user.id);
-            setPushRegistered(registered);
+            const status = await getPushSetupStatus(user.id, true);
+            setPushStatus(status);
             show(
-              registered
+              status === "ready"
                 ? "Partner alerts on — background push enabled"
-                : "Partner alerts on — saved locally, retry Test background push",
+                : "Partner alerts on — tap Test background push to finish setup",
             );
           } catch (err) {
-            setPushRegistered(false);
+            setPushStatus("needs_register");
             show(err instanceof Error ? err.message : "Could not register for background push");
           }
         } else {
@@ -165,6 +178,7 @@ export function SettingsScreen() {
     } else {
       setPartnerAlertsEnabled(user.id, false);
       setPartnerAlertsOn(false);
+      setPushStatus(null);
       await unregisterWebPushSubscription(user.id);
       show("Partner alerts off");
     }
@@ -181,12 +195,32 @@ export function SettingsScreen() {
           show(err instanceof Error ? err.message : "Device registration failed");
           return;
         }
-        setPushRegistered(await hasPushSubscription(user.id));
+        const status = await getPushSetupStatus(user.id, true);
+        setPushStatus(status);
       }
       const result = await sendTestBackgroundPush(user.email);
       show(result.message);
     } finally {
       setTestingPush(false);
+    }
+  };
+
+  const pushStatusLabel = (status: PushSetupStatus | null): string => {
+    switch (status) {
+      case "ready":
+        return "device registered — works when app is closed";
+      case "needs_register":
+        return "not registered — tap Test background push";
+      case "needs_pwa":
+        return "add to Home Screen first (iPhone)";
+      case "needs_permission":
+        return "allow notifications in Settings";
+      case "needs_vapid":
+        return "VAPID key missing — redeploy with VITE_VAPID_PUBLIC_KEY";
+      case "needs_enable":
+        return "off";
+      default:
+        return "checking…";
     }
   };
 
@@ -457,13 +491,8 @@ export function SettingsScreen() {
                 )}
                 {partnerAlertsOn && webPushSupported() && (
                   <div className="flex flex-col gap-2">
-                    <p className="text-caption text-ink-muted-48">
-                      Background push:{" "}
-                      {pushRegistered === null
-                        ? "checking…"
-                        : pushRegistered
-                          ? "device registered"
-                          : "not registered — toggle alerts off/on"}
+                    <p className="text-caption text-ink-muted-48" data-testid="settings-push-status">
+                      Background push: {pushStatusLabel(pushStatus)}
                     </p>
                     <Button
                       variant="secondary"

@@ -16,9 +16,9 @@ const PARTNER_ALERTS_KEY = "em.partnerAlerts";
 export function partnerAlertsEnabled(userId: string): boolean {
   try {
     const v = localStorage.getItem(`${PARTNER_ALERTS_KEY}.${userId}`);
-    return v === null ? true : v === "1";
+    return v === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 

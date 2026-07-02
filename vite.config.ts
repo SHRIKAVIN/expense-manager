@@ -21,7 +21,7 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
       },
-      manifest: {
+        manifest: {
         name: "Expense Manager",
         short_name: "Expenses",
         description: "A production-quality personal expense manager.",
@@ -31,6 +31,7 @@ export default defineConfig({
         orientation: "portrait",
         start_url: "/",
         scope: "/",
+        id: "/",
         icons: [
           {
             src: "/icons/icon-192.png",
