@@ -297,19 +297,12 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const { data: exp, error: fetchErr } = await sb()
         .from("expenses")
-        .select("receipt_id, excluded_from_totals, reimbursement_request_id, notes")
+        .select("receipt_id")
         .eq("id", id)
         .eq("user_id", userId)
         .maybeSingle();
       if (fetchErr) throwDb(fetchErr.message);
       if (!exp) throwDb("Expense not found.", "not_found");
-      if (exp.excluded_from_totals || exp.reimbursement_request_id) {
-        throwDb("Reimbursed expenses cannot be deleted.", "forbidden");
-      }
-      const notes = exp.notes as string | null;
-      if (notes?.includes("Reimbursed from")) {
-        throwDb("Reimbursed expenses cannot be deleted.", "forbidden");
-      }
 
       const { error } = await sb().from("expenses").delete().eq("id", id).eq("user_id", userId);
       if (error) throwDb(error.message);

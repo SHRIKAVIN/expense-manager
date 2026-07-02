@@ -49,7 +49,8 @@ export function ExpenseRow({
   const x = useMotionValue(0);
   const revealOpacity = useTransform(x, [-80, -20], [1, 0]);
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const canModify = can.writeExpenses && !isLogEntry;
+  const canWrite = can.writeExpenses;
+  const canEdit = canWrite && !isLogEntry;
 
   const openReceipt = async () => {
     if (!expense.receiptId) return;
@@ -108,16 +109,18 @@ export function ExpenseRow({
         −{formatCurrency(expense.amount, currency)}
       </span>
 
-      {canModify && (
+      {canWrite && (
         <div className="hidden lg:flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          <button
-            type="button"
-            aria-label="Edit"
-            onClick={() => onEdit(expense)}
-            className="h-9 w-9 rounded-full flex items-center justify-center text-primary outline-none"
-          >
-            <EditIcon size={18} />
-          </button>
+          {canEdit && (
+            <button
+              type="button"
+              aria-label="Edit"
+              onClick={() => onEdit(expense)}
+              className="h-9 w-9 rounded-full flex items-center justify-center text-primary outline-none"
+            >
+              <EditIcon size={18} />
+            </button>
+          )}
           <button
             type="button"
             aria-label="Delete"
@@ -134,7 +137,7 @@ export function ExpenseRow({
   return (
     <>
       <div className="group relative overflow-hidden border-b border-divider-soft last:border-b-0">
-        {canModify && (
+        {canWrite && (
           <motion.div
             style={{ opacity: revealOpacity }}
             className="lg:hidden absolute inset-y-0 right-0 w-20 flex items-center justify-center text-ink-muted-48"
@@ -143,7 +146,7 @@ export function ExpenseRow({
           </motion.div>
         )}
 
-        {canModify ? (
+        {canEdit ? (
           <motion.div
             drag={reduced ? false : "x"}
             dragConstraints={{ left: -96, right: 0 }}
@@ -155,6 +158,20 @@ export function ExpenseRow({
               x.set(0);
             }}
             className="cursor-pointer bg-canvas lg:cursor-default"
+          >
+            {rowInner}
+          </motion.div>
+        ) : canWrite ? (
+          <motion.div
+            drag={reduced ? false : "x"}
+            dragConstraints={{ left: -96, right: 0 }}
+            dragElastic={0.1}
+            style={{ x }}
+            onDragEnd={(_, info) => {
+              if (info.offset.x < -80) onDelete(expense);
+              x.set(0);
+            }}
+            className="bg-canvas"
           >
             {rowInner}
           </motion.div>

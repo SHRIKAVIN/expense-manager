@@ -230,12 +230,6 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       requireWrite();
       const exp = await db.expenses.get(id);
       if (!exp || exp.userId !== userId) throw new RepositoryError("not_found", "Expense not found.");
-      if (exp.excludedFromTotals || exp.reimbursementRequestId) {
-        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be deleted.");
-      }
-      if (exp.notes?.includes("Reimbursed from")) {
-        throw new RepositoryError("forbidden", "Reimbursed expenses cannot be deleted.");
-      }
       if (exp.receiptId) await db.receipts.delete(exp.receiptId);
       await db.expenses.delete(id);
     },
