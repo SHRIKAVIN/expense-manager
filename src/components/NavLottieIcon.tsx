@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactElement } from "react";
+import { useMemo, type ReactElement } from "react";
 import { useLottie } from "lottie-react";
 import { cn } from "@/lib/cn";
 import { applyLottieInkTheme } from "@/lib/lottieTheme";
@@ -32,12 +32,23 @@ function NavLottieView({
   className?: string;
 }) {
   const { resolved } = useTheme();
-  const themedData = useMemo(
-    () => applyLottieInkTheme(animationData, resolved),
-    [animationData, resolved],
-  );
+  const themedData = useMemo(() => {
+    const data = applyLottieInkTheme(animationData, resolved) as { fr?: number };
+    // Bake playback rate into frame rate — more reliable than setSpeed for
+    // image-sequence comps (dashboard), and avoids non-reactive animationItem.
+    if (speed !== 1 && typeof data.fr === "number") {
+      // Only clone when we must mutate fr on a shared (non-themed) object.
+      if (data === animationData) {
+        const clone = structuredClone(animationData) as { fr?: number };
+        if (typeof clone.fr === "number") clone.fr = clone.fr * speed;
+        return clone;
+      }
+      data.fr = data.fr * speed;
+    }
+    return data;
+  }, [animationData, resolved, speed]);
   const renderSize = Math.round(size * zoom);
-  const { View, animationItem } = useLottie(
+  const { View } = useLottie(
     {
       animationData: themedData,
       loop: true,
@@ -46,10 +57,6 @@ function NavLottieView({
     },
     { width: renderSize, height: renderSize },
   );
-
-  useEffect(() => {
-    animationItem?.setSpeed(speed);
-  }, [animationItem, speed]);
 
   return (
     <span

@@ -32,11 +32,54 @@ function remapColor(
   return k;
 }
 
+function colorNeedsRemap(k: unknown, ty: string | undefined): boolean {
+  if (!Array.isArray(k) || k.length < 3) return false;
+  if (!k.every((n) => typeof n === "number")) return false;
+  const c = k as number[];
+  if (ty === "st") return isNearBlack(c) || isNearWhite(c);
+  if (ty === "fl") return isNearBlack(c);
+  return false;
+}
+
+/** True if this Lottie has monochrome strokes/fills that should follow theme ink. */
+export function lottieNeedsInkTheme(data: object): boolean {
+  let needed = false;
+  const walk = (obj: unknown): void => {
+    if (needed || !obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) {
+      for (const item of obj) {
+        walk(item);
+        if (needed) return;
+      }
+      return;
+    }
+    const rec = obj as Record<string, unknown>;
+    const ty = typeof rec.ty === "string" ? rec.ty : undefined;
+    if ((ty === "st" || ty === "fl") && rec.c && typeof rec.c === "object") {
+      const c = rec.c as Record<string, unknown>;
+      if (colorNeedsRemap(c.k, ty)) {
+        needed = true;
+        return;
+      }
+    }
+    for (const value of Object.values(rec)) {
+      walk(value);
+      if (needed) return;
+    }
+  };
+  walk(data);
+  return needed;
+}
+
 /**
- * Deep-clone a Lottie JSON and remap monochrome ink so icons stay visible
- * in both light and dark themes (same approach as the header menu icon).
+ * Remap monochrome ink so icons stay visible in light + dark.
+ * Returns the original reference when nothing needs remapping (avoids
+ * structuredClone of huge image-sequence Lotties like dashboard — which
+ * can fail or stall on mobile PWAs).
  */
 export function applyLottieInkTheme(data: object, theme: ResolvedTheme): object {
+  if (!lottieNeedsInkTheme(data)) return data;
+
   const ink = lottieInkColor(theme);
   const clone = structuredClone(data) as unknown;
 
