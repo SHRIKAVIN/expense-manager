@@ -9,12 +9,13 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { groupByDay } from "@/lib/analytics";
 import { exportExpensesPdf } from "@/lib/exportPdf";
-import { formatDayHeading, todayISO } from "@/lib/format";
+import { formatCurrency, formatDayHeading, todayISO } from "@/lib/format";
 import {
   CategoryGlyph,
   ChevronDownIcon,
@@ -44,6 +45,10 @@ export function TransactionsScreen() {
   const [dateTo, setDateTo] = useState(todayISO());
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<{
+    amountLabel: string;
+    detail?: string;
+  } | null>(null);
 
   const activeCategories = categories.filter((c) => !c.archived);
 
@@ -66,9 +71,13 @@ export function TransactionsScreen() {
 
   const confirmDelete = async () => {
     if (!confirmTarget) return;
-    await removeExpense(confirmTarget.id);
-    show("Expense deleted");
+    const target = confirmTarget;
+    await removeExpense(target.id);
     setConfirmTarget(null);
+    setDeleteSuccess({
+      amountLabel: formatCurrency(target.amount, currency),
+      detail: target.merchant,
+    });
   };
 
   const exportPdf = async () => {
@@ -240,6 +249,13 @@ export function TransactionsScreen() {
         confirmLabel="Delete"
         onConfirm={confirmDelete}
         onClose={() => setConfirmTarget(null)}
+      />
+      <SuccessOverlay
+        open={!!deleteSuccess}
+        variant="deleted"
+        amountLabel={deleteSuccess?.amountLabel ?? ""}
+        detail={deleteSuccess?.detail}
+        onClose={() => setDeleteSuccess(null)}
       />
     </Screen>
   );

@@ -2,17 +2,17 @@ import { useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { goToDashboard } from "./navigateHome";
 import { cn } from "@/lib/cn";
-import {
-  ChartIcon,
-  HomeIcon,
-  IncomeIcon,
-  ListIcon,
-  MenuIcon,
-  SettingsIcon,
-  WalletIcon,
-} from "@/lib/icons";
 import { Sheet } from "@/components/Sheet";
 import { IconBadge3D } from "@/components/EmbossedIcon";
+import {
+  BudgetsNavIcon,
+  DashboardNavIcon,
+  IncomeNavIcon,
+  InsightsNavIcon,
+  MenuNavIcon,
+  SettingsNavIcon,
+  TransactionsNavIcon,
+} from "@/components/NavLottieIcon";
 import { ProfileGenderIcon } from "@/components/ProfileGenderIcon";
 import { useAuth } from "@/auth/AuthProvider";
 import {
@@ -24,12 +24,12 @@ import { useToast } from "@/components/Toast";
 import type { Gender } from "@/lib/types";
 
 export const APP_NAV = [
-  { to: "/", label: "Dashboard", icon: HomeIcon, end: true as const },
-  { to: "/transactions", label: "Transactions", icon: ListIcon, end: false as const },
-  { to: "/income", label: "Income", icon: IncomeIcon, end: false as const },
-  { to: "/budgets", label: "Budgets", icon: WalletIcon, end: false as const },
-  { to: "/insights", label: "Insights", icon: ChartIcon, end: false as const },
-  { to: "/settings", label: "Settings", icon: SettingsIcon, end: false as const },
+  { to: "/", label: "Dashboard", icon: DashboardNavIcon, end: true as const },
+  { to: "/transactions", label: "Transactions", icon: TransactionsNavIcon, end: false as const },
+  { to: "/income", label: "Income", icon: IncomeNavIcon, end: false as const },
+  { to: "/budgets", label: "Budgets", icon: BudgetsNavIcon, end: false as const },
+  { to: "/insights", label: "Insights", icon: InsightsNavIcon, end: false as const },
+  { to: "/settings", label: "Settings", icon: SettingsNavIcon, end: false as const },
 ];
 
 function currentRoute(pathname: string) {
@@ -141,9 +141,9 @@ export function AppHeader() {
             aria-expanded={menuOpen}
             data-testid="nav-menu-open"
             onClick={() => setMenuOpen(true)}
-            className="h-10 w-10 -mr-1 flex items-center justify-center rounded-md text-ink outline-none shrink-0"
+            className="h-14 w-14 -mr-2 flex items-center justify-center rounded-md text-ink outline-none shrink-0"
           >
-            <MenuIcon size={24} strokeWidth={2.1} />
+            <MenuNavIcon size={60} />
           </button>
         </div>
       </header>
@@ -228,7 +228,7 @@ export function AppHeader() {
                     <IconBadge3D icon={Icon} size="sm" />
                   ) : (
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-muted-80">
-                      <Icon size={20} strokeWidth={1.8} />
+                      <Icon size={28} strokeWidth={1.8} />
                     </span>
                   )}
                   <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>

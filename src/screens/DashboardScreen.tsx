@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut } from "@/features/CategoryDonut";
 import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
@@ -46,6 +47,10 @@ export function DashboardScreen() {
 
   const [editing, setEditing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
+  const [deleteSuccess, setDeleteSuccess] = useState<{
+    amountLabel: string;
+    detail?: string;
+  } | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [refreshing, setRefreshing] = useState(false);
@@ -145,9 +150,13 @@ export function DashboardScreen() {
 
   const confirmDelete = async () => {
     if (!confirmTarget) return;
-    await removeExpense(confirmTarget.id);
-    show("Expense deleted");
+    const target = confirmTarget;
+    await removeExpense(target.id);
     setConfirmTarget(null);
+    setDeleteSuccess({
+      amountLabel: formatCurrency(target.amount, currency),
+      detail: target.merchant,
+    });
   };
 
   const handleRefresh = async () => {
@@ -342,6 +351,13 @@ export function DashboardScreen() {
         confirmLabel="Delete"
         onConfirm={confirmDelete}
         onClose={() => setConfirmTarget(null)}
+      />
+      <SuccessOverlay
+        open={!!deleteSuccess}
+        variant="deleted"
+        amountLabel={deleteSuccess?.amountLabel ?? ""}
+        detail={deleteSuccess?.detail}
+        onClose={() => setDeleteSuccess(null)}
       />
       <DashboardSummarySheet
         kind={summaryKind}

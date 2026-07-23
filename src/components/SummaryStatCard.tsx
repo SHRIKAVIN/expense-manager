@@ -27,7 +27,7 @@ export function SummaryStatCard({
 
   const inner = (
     <>
-      <p className="text-[11px] font-bold leading-snug text-ink-muted-48 sm:text-[13px] text-center">{label}</p>
+      <p className="text-[11px] font-bold leading-snug text-ink-muted-80 sm:text-[13px] text-center">{label}</p>
       <div className="min-w-0 text-[15px] font-bold tabular-nums leading-none tracking-tight sm:text-[22px] lg:text-[26px] text-center">
         {children}
       </div>

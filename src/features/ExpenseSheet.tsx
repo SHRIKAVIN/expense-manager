@@ -9,9 +9,10 @@ import { useAuth } from "@/auth/AuthProvider";
 import { getReimbursementPartner } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
 import { Lightbox } from "@/components/Lightbox";
+import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { compressImage } from "@/lib/image";
 import { cn } from "@/lib/cn";
-import { todayISO } from "@/lib/format";
+import { formatCurrency, todayISO } from "@/lib/format";
 import type { Expense } from "@/lib/types";
 
 interface ExpenseSheetProps {
@@ -26,6 +27,10 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const { user } = useAuth();
   const { show } = useToast();
   const reimbursementPartner = user ? getReimbursementPartner(user.email) : null;
+  const [success, setSuccess] = useState<{
+    amountLabel: string;
+    detail?: string;
+  } | null>(null);
 
   /** Active categories sorted by usage frequency (most frequently used first). */
   const activeCategories = useMemo(() => {
@@ -175,15 +180,18 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         } else {
           show("Expense updated");
         }
+        onClose();
       } else {
         await addExpense(payload);
-        show(
-          requestReimbursement && reimbursementPartner
-            ? `Expense added — ${reimbursementPartner.name} will be notified to reimburse`
-            : "Expense added",
-        );
+        onClose();
+        setSuccess({
+          amountLabel: formatCurrency(amt, user?.currency),
+          detail:
+            requestReimbursement && reimbursementPartner
+              ? `${reimbursementPartner.name} will be notified to reimburse`
+              : undefined,
+        });
       }
-      onClose();
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not save expense");
     } finally {
@@ -192,6 +200,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   };
 
   return (
+    <>
     <Sheet
       open={open}
       onClose={onClose}
@@ -353,5 +362,12 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       </div>
       <Lightbox src={receiptLightbox} onClose={() => setReceiptLightbox(null)} />
     </Sheet>
+    <SuccessOverlay
+      open={!!success}
+      amountLabel={success?.amountLabel ?? ""}
+      detail={success?.detail}
+      onClose={() => setSuccess(null)}
+    />
+    </>
   );
 }

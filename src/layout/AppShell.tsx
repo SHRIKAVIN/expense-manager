@@ -129,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             className={cn(
               "flex-1 min-h-0 overflow-y-auto overflow-x-hidden lg:pb-12",
               showFab
-                ? "pb-[calc(var(--fab-bottom-offset)+4.25rem)]"
+                ? "pb-[calc(var(--fab-bottom-offset)+5.75rem)]"
                 : "pb-[var(--fab-bottom-offset)]",
             )}
           >
@@ -190,7 +190,7 @@ function RailLink({
     >
       {({ isActive }) => (
         <>
-          <Icon size={22} strokeWidth={isActive ? 2.1 : 1.8} />
+          <Icon size={30} strokeWidth={isActive ? 2.1 : 1.8} />
           <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>
         </>
       )}

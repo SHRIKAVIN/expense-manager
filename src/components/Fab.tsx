@@ -1,5 +1,8 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
+import { useLottie } from "lottie-react";
 import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
+import fabAddAnimation from "@/assets/lottie/fab-add.json";
 
 interface FabProps {
   onClick: () => void;
@@ -7,27 +10,33 @@ interface FabProps {
   "data-testid"?: string;
 }
 
-function PlusIcon3D({ size = 26 }: { size?: number }) {
-  const stroke = 2.75;
-  const d = "M12 5v14M5 12h14";
+function FabAddLottie({ size = 56 }: { size?: number }) {
+  const { View, animationItem } = useLottie(
+    {
+      animationData: fabAddAnimation,
+      loop: true,
+      autoplay: true,
+      rendererSettings: { preserveAspectRatio: "xMidYMid meet" },
+    },
+    { width: size, height: size },
+  );
+
+  useEffect(() => {
+    animationItem?.setSpeed(0.65);
+  }, [animationItem]);
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden className="relative z-[1]">
-      <g strokeLinecap="round" fill="none">
-        <g stroke="rgba(0,0,0,0.34)" strokeWidth={stroke} transform="translate(0 0.85)">
-          <path d={d} />
-        </g>
-        <g stroke="rgba(255,255,255,0.42)" strokeWidth={stroke} transform="translate(0 -0.45)">
-          <path d={d} />
-        </g>
-        <g stroke="#ffffff" strokeWidth={stroke}>
-          <path d={d} />
-        </g>
-      </g>
-    </svg>
+    <span
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden"
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      {View}
+    </span>
   );
 }
 
-/** Floating add button — 3D elevated tile with embossed plus (expense / income). */
+/** Floating add button — animated Lottie plus (expense / income). */
 export function Fab({
   onClick,
   label = "Add expense",
@@ -42,9 +51,9 @@ export function Fab({
       data-testid={testId}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
-      className="fab-3d absolute z-40 right-5 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 flex h-14 w-14 items-center justify-center rounded-full text-on-primary outline-none"
+      className="absolute z-40 right-4 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 flex h-20 w-20 items-center justify-center rounded-full outline-none"
     >
-      <PlusIcon3D size={26} />
+      <FabAddLottie size={80} />
     </motion.button>
   );
 }

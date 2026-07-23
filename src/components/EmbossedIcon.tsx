@@ -1,5 +1,6 @@
 import type { ReactElement, SVGProps } from "react";
 import { cn } from "@/lib/cn";
+import { isNavLottieIcon } from "@/components/NavLottieIcon";
 
 type IconComponent = (props: SVGProps<SVGSVGElement> & { size?: number }) => ReactElement;
 
@@ -43,22 +44,28 @@ interface IconBadge3DProps {
 }
 
 const badgeSizes = {
-  sm: { box: "h-8 w-8", icon: 17, stroke: 1.9 },
-  md: { box: "h-10 w-10", icon: 20, stroke: 2 },
+  sm: { box: "h-8 w-8", icon: 26, stroke: 1.9 },
+  md: { box: "h-10 w-10", icon: 34, stroke: 2 },
 } as const;
 
 /** Gradient tile badge with embossed icon — header / nav use. */
-export function IconBadge3D({ icon, size = "md", className }: IconBadge3DProps) {
+export function IconBadge3D({ icon: Icon, size = "md", className }: IconBadge3DProps) {
   const dim = badgeSizes[size];
+  const lottie = isNavLottieIcon(Icon);
   return (
     <div
       className={cn(
-        "icon-badge-3d flex shrink-0 items-center justify-center rounded-sm",
+        "flex shrink-0 items-center justify-center rounded-sm",
         dim.box,
+        !lottie && "icon-badge-3d",
         className,
       )}
     >
-      <EmbossedIcon icon={icon} size={dim.icon} strokeWidth={dim.stroke} />
+      {lottie ? (
+        <Icon size={dim.icon} />
+      ) : (
+        <EmbossedIcon icon={Icon} size={size === "sm" ? 17 : 20} strokeWidth={dim.stroke} />
+      )}
     </div>
   );
 }
