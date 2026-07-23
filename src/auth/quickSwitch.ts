@@ -5,8 +5,8 @@ const HOME_EMAIL_KEY = "em.quickSwitch.homeEmail";
 
 /** Dev/demo quick-switch accounts only — do not use in production builds. */
 export const QUICK_SWITCH_USERS = [
-  { email: "shrikavinkbs@gmail.com", password: "123456", name: "Shrikavin" },
-  { email: "sylviamicheal308@gmail.com", password: "123456", name: "Sylvia" },
+  { email: "shrikavinkbs@gmail.com", password: "123456", name: "Shrikavin", gender: "male" as const },
+  { email: "sylviamicheal308@gmail.com", password: "123456", name: "Sylvia", gender: "female" as const },
 ] as const;
 
 export type QuickSwitchAccount = (typeof QUICK_SWITCH_USERS)[number];
@@ -75,6 +75,11 @@ export function isQuickSwitchViewOnly(currentEmail: string): boolean {
 export function getQuickSwitchAccountName(email: string): string | null {
   const account = QUICK_SWITCH_USERS.find((u) => u.email === email.toLowerCase());
   return account?.name ?? null;
+}
+
+export function getQuickSwitchGender(email: string): "male" | "female" | null {
+  const account = QUICK_SWITCH_USERS.find((u) => u.email === email.toLowerCase());
+  return account?.gender ?? null;
 }
 
 export async function cacheCurrentQuickSwitchSession(email: string) {

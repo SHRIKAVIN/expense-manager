@@ -4,6 +4,8 @@ export type ThemePreference = "light" | "dark" | "system";
 
 export type ResolvedTheme = "light" | "dark";
 
+export type Gender = "male" | "female";
+
 export interface User {
   id: string;
   email: string;
@@ -11,6 +13,7 @@ export interface User {
   role: Role;
   currency: string;
   themePreference: ThemePreference;
+  gender?: Gender;
   createdAt: number;
 }
 

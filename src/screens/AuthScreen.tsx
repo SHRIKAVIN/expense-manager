@@ -4,12 +4,17 @@ import { TextField } from "@/components/TextField";
 import { Chip } from "@/components/Chip";
 import { useAuth } from "@/auth/AuthProvider";
 import { AppLogoMark } from "@/components/AppLogoMark";
-import type { Role } from "@/lib/types";
+import type { Gender, Role } from "@/lib/types";
 
 const ROLES: { value: Role; label: string; blurb: string }[] = [
   { value: "Owner", label: "Owner", blurb: "Full access — manage everything." },
   { value: "Member", label: "Member", blurb: "Add & edit expenses, view budgets." },
   { value: "Viewer", label: "Viewer", blurb: "Read-only dashboards & insights." },
+];
+
+const GENDERS: { value: Gender; label: string }[] = [
+  { value: "male", label: "Male" },
+  { value: "female", label: "Female" },
 ];
 
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "JPY", "AUD", "CAD", "SGD"];
@@ -21,6 +26,7 @@ export function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("Owner");
+  const [gender, setGender] = useState<Gender>("male");
   const [currency, setCurrency] = useState("INR");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -30,7 +36,7 @@ export function AuthScreen() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        await signup({ email, password, displayName, role, currency });
+        await signup({ email, password, displayName, role, currency, gender });
       } else {
         await login(email, password);
       }
@@ -97,6 +103,17 @@ export function AuthScreen() {
 
           {mode === "signup" && (
             <>
+              <div className="flex flex-col gap-2">
+                <span className="text-caption-strong text-ink-muted-80">Gender</span>
+                <div className="flex flex-wrap gap-2">
+                  {GENDERS.map((g) => (
+                    <Chip key={g.value} selected={gender === g.value} onClick={() => setGender(g.value)}>
+                      {g.label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2">
                 <span className="text-caption-strong text-ink-muted-80">Role</span>
                 <div className="flex flex-wrap gap-2">

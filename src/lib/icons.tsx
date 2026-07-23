@@ -186,6 +186,25 @@ export const UserIcon = (p: IconProps) => (
   </svg>
 );
 
+/** Male avatar — short hair silhouette. */
+export const MaleProfileIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" />
+    <path d="M8.5 5.2c.6-1.2 1.8-2 3.5-2s2.9.8 3.5 2" />
+  </svg>
+);
+
+/** Female avatar — longer hair silhouette. */
+export const FemaleProfileIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M7 10c0-3.2 2.1-5.5 5-5.5s5 2.3 5 5.5c0 1.2-.3 2.3-.8 3.2" />
+    <circle cx="12" cy="8.5" r="3.2" />
+    <path d="M6.5 14c.8-1.2 1.6-1.8 2.8-2.2M17.5 14c-.8-1.2-1.6-1.8-2.8-2.2" />
+    <path d="M5 20c1.5-3.2 4-4.8 7-4.8s5.5 1.6 7 4.8" />
+  </svg>
+);
+
 export const RepeatIcon = (p: IconProps) => (
   <svg {...base(p)}>
     <path d="M17 2l4 4-4 4" />

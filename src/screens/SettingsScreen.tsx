@@ -45,7 +45,6 @@ import {
 } from "@/lib/icons";
 import { formatCurrency, relativeDue } from "@/lib/format";
 import { exportExpensesPdf } from "@/lib/exportPdf";
-import type { QuickSwitchEmail } from "@/auth/quickSwitch";
 import type { Category, Recurring } from "@/lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -60,7 +59,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function SettingsScreen() {
-  const { user, logout, updateProfile, canQuickSwitch, quickSwitchUsers, switchQuickUser, isQuickSwitchViewOnly } = useAuth();
+  const { user, logout, updateProfile, isQuickSwitchViewOnly } = useAuth();
   const { categories, recurring, expenses, categoriesById, can, repo, removeCategory, removeRecurring, refresh } =
     useAppData();
   const { show } = useToast();
@@ -275,17 +274,6 @@ export function SettingsScreen() {
     setConfirmCategory(null);
   };
 
-  const handleQuickSwitch = async (email: QuickSwitchEmail) => {
-    if (user?.email.toLowerCase() === email) return;
-    const account = quickSwitchUsers.find((u) => u.email === email);
-    try {
-      await switchQuickUser(email);
-      show(`Switched to ${account?.name ?? "user"}`);
-    } catch (err) {
-      show(err instanceof Error ? err.message : "Could not switch user");
-    }
-  };
-
   const deleteAll = async () => {
     const ok = window.confirm(
       "Delete all your data? This removes every transaction, category and budget for your account. This cannot be undone.",
@@ -320,36 +308,6 @@ export function SettingsScreen() {
             </div>
           </Card>
         </Section>
-
-        {canQuickSwitch && (
-          <Section title="Switch user">
-            <Card className="flex flex-col gap-3" data-testid="settings-quick-switch">
-              <p className="text-caption text-ink-muted-48">
-                Switch accounts to view your partner&apos;s expenses.
-              </p>
-              {quickSwitchUsers.map((account) => {
-                const active = user?.email.toLowerCase() === account.email;
-                const isHome = !isQuickSwitchViewOnly && active;
-                return (
-                  <Button
-                    key={account.email}
-                    variant={active ? "primary" : "secondary"}
-                    fullWidth
-                    disabled={active}
-                    data-testid={`settings-switch-${account.name.toLowerCase()}`}
-                    onClick={() => void handleQuickSwitch(account.email)}
-                  >
-                    {isHome
-                      ? `Active: ${account.name}`
-                      : active
-                        ? `Viewing: ${account.name}`
-                        : `View ${account.name}'s account`}
-                  </Button>
-                );
-              })}
-            </Card>
-          </Section>
-        )}
 
         {/* Appearance */}
         <Section title="Appearance">

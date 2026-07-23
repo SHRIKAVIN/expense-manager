@@ -9,6 +9,7 @@ export interface DbProfile {
   role: DbRole;
   currency: string;
   theme_preference: DbThemePreference;
+  gender: "male" | "female" | null;
   recurring_reminders_enabled: boolean;
   partner_alerts_enabled: boolean;
   created_at: string;

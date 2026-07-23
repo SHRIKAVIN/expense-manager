@@ -13,6 +13,7 @@ import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import { useToast } from "@/components/Toast";
 import { clearAppBadge } from "@/lib/appBadge";
+import { ProfileGenderIcon } from "@/components/ProfileGenderIcon";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
 
@@ -22,7 +23,7 @@ const INCOME_FAB_ROUTE = "/income";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { can } = useAppData();
-  const { isQuickSwitchViewOnly, user } = useAuth();
+  const { isQuickSwitchViewOnly, user, canQuickSwitch, quickSwitchUsers, switchQuickUser } = useAuth();
   const { show } = useToast();
   const location = useLocation();
   const reduced = usePrefersReducedMotion();
@@ -79,16 +80,46 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         {/* Left rail (desktop) */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8">
-          <div className="px-3 mb-8 flex items-center gap-2">
-            <HomeLogoButton icon={HomeIcon} />
-            <span className="text-tagline text-ink">Expenses</span>
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8 justify-between">
+          <div>
+            <div className="px-3 mb-8 flex items-center gap-2">
+              <HomeLogoButton icon={HomeIcon} />
+              <span className="text-tagline text-ink">Expenses</span>
+            </div>
+            <nav className="flex flex-col gap-1">
+              {APP_NAV.map((item) => (
+                <RailLink key={item.to} {...item} />
+              ))}
+            </nav>
           </div>
-          <nav className="flex flex-col gap-1">
-            {APP_NAV.map((item) => (
-              <RailLink key={item.to} {...item} />
-            ))}
-          </nav>
+
+          {canQuickSwitch && (
+            <div className="px-1 mt-auto pt-6 border-t border-hairline flex flex-col gap-2">
+              <span className="text-fine-print text-ink-muted-48 uppercase tracking-wider font-semibold px-2">
+                Switch Profile
+              </span>
+              {quickSwitchUsers.map((acc) => {
+                const active = user?.email.toLowerCase() === acc.email;
+                return (
+                  <button
+                    key={acc.email}
+                    type="button"
+                    disabled={active}
+                    onClick={() => void switchQuickUser(acc.email)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md px-3 py-2 text-caption font-medium outline-none transition-all w-full text-left",
+                      active
+                        ? "bg-primary text-on-primary"
+                        : "text-ink hover:bg-canvas border border-transparent",
+                    )}
+                  >
+                    <ProfileGenderIcon gender={acc.gender} size={28} />
+                    <span className="truncate flex-1">{acc.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </aside>
 
         <div className="relative flex-1 min-h-0 min-w-0 flex flex-col">

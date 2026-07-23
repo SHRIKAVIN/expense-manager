@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { Button } from "@/components/Button";
 import { TextField, TextArea } from "@/components/TextField";
@@ -10,6 +10,7 @@ import { getReimbursementPartner } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
 import { Lightbox } from "@/components/Lightbox";
 import { compressImage } from "@/lib/image";
+import { cn } from "@/lib/cn";
 import { todayISO } from "@/lib/format";
 import type { Expense } from "@/lib/types";
 
@@ -21,11 +22,27 @@ interface ExpenseSheetProps {
 }
 
 export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
-  const { categories, addExpense, editExpense, repo, reimbursementByExpenseId } = useAppData();
+  const { categories, expenses, addExpense, editExpense, repo, reimbursementByExpenseId } = useAppData();
   const { user } = useAuth();
   const { show } = useToast();
   const reimbursementPartner = user ? getReimbursementPartner(user.email) : null;
-  const activeCategories = categories.filter((c) => !c.archived);
+
+  /** Active categories sorted by usage frequency (most frequently used first). */
+  const activeCategories = useMemo(() => {
+    const active = categories.filter((c) => !c.archived);
+    const freq: Record<string, number> = {};
+    for (const e of expenses) {
+      freq[e.categoryId] = (freq[e.categoryId] || 0) + 1;
+    }
+    return [...active].sort((a, b) => {
+      const countA = freq[a.id] || 0;
+      const countB = freq[b.id] || 0;
+      if (countB !== countA) {
+        return countB - countA;
+      }
+      return 0;
+    });
+  }, [categories, expenses]);
 
   const [amount, setAmount] = useState("");
   const [merchant, setMerchant] = useState("");
@@ -229,6 +246,49 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           )}
         </div>
 
+        {reimbursementPartner && (
+          <button
+            type="button"
+            disabled={reimbursementLocked}
+            onClick={() => !reimbursementLocked && setRequestReimbursement(!requestReimbursement)}
+            className={cn(
+              "flex w-full flex-col text-left rounded-md px-4 py-3.5 transition-all outline-none",
+              reimbursementLocked
+                ? "opacity-80 cursor-not-allowed border border-hairline bg-canvas"
+                : requestReimbursement
+                ? "border-2 border-primary bg-primary/10 text-primary"
+                : "border border-hairline bg-canvas hover:bg-canvas-parchment/60 text-ink",
+            )}
+            data-testid="expense-reimbursement-toggle"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={cn(
+                  "text-body-strong block",
+                  requestReimbursement ? "text-primary font-semibold" : "text-ink",
+                )}
+              >
+                Request reimbursement
+              </span>
+              {requestReimbursement && (
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary text-xs font-bold">
+                  ✓
+                </span>
+              )}
+            </div>
+            <span
+              className={cn(
+                "text-caption mt-1 block",
+                requestReimbursement ? "text-primary/90" : "text-ink-muted-48",
+              )}
+            >
+              {reimbursementLocked
+                ? `${existingReimbursement!.payerName} marked this paid — confirm on the dashboard.`
+                : `Ask ${reimbursementPartner.name} to pay you back. After they mark paid, you confirm receipt and the expense is removed.`}
+            </span>
+          </button>
+        )}
+
         <TextField
           label="Date"
           type="date"
@@ -251,31 +311,6 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           onChange={(e) => setNotes(e.target.value)}
           data-testid="expense-notes"
         />
-
-        {reimbursementPartner && (
-          <label
-            className={`flex items-start gap-3 rounded-md border border-hairline px-4 py-3 ${
-              reimbursementLocked ? "opacity-80 cursor-default" : "cursor-pointer"
-            }`}
-            data-testid="expense-reimbursement-toggle"
-          >
-            <input
-              type="checkbox"
-              checked={requestReimbursement}
-              disabled={reimbursementLocked}
-              onChange={(e) => setRequestReimbursement(e.target.checked)}
-              className="mt-1 h-4 w-4 accent-primary disabled:opacity-50"
-            />
-            <span>
-              <span className="text-body-strong text-ink block">Request reimbursement</span>
-              <span className="text-caption text-ink-muted-48">
-                {reimbursementLocked
-                  ? `${existingReimbursement!.payerName} marked this paid — confirm on the dashboard.`
-                  : `Ask ${reimbursementPartner.name} to pay you back. After they mark paid, you confirm receipt and the expense is removed.`}
-              </span>
-            </span>
-          </label>
-        )}
 
         <div className="flex flex-col gap-2" data-testid="expense-receipt">
           <span className="text-caption-strong text-ink-muted-80">Receipt (optional)</span>

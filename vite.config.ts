@@ -109,9 +109,11 @@ export default defineConfig({
         id: "/",
         icons: themedIcons,
       },
+      // injectManifest SW uses ESM imports; Vite's module SW is Chromium-only and
+      // often throws "Cannot use import statement outside a module" in local/dev.
+      // Use `vite preview` (or production) to exercise the service worker.
       devOptions: {
-        enabled: true,
-        type: "module",
+        enabled: false,
       },
     }),
   ],

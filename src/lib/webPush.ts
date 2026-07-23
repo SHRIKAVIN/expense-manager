@@ -67,8 +67,21 @@ export async function registerWebPushSubscription(userId: string): Promise<void>
     );
   }
 
+  // VitePWA injects registration in production. Avoid re-registering the ESM
+  // dev worker without `type: "module"` (causes "import outside a module").
   if (!navigator.serviceWorker.controller) {
-    await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (!existing) {
+      if (import.meta.env.DEV) {
+        throw new Error(
+          "Service worker is disabled in Vite dev. Use a production build or `vite preview` to test push.",
+        );
+      }
+      await navigator.serviceWorker.register("/sw.js", {
+        scope: "/",
+        updateViaCache: "none",
+      });
+    }
   }
   const reg = await waitForServiceWorker();
 

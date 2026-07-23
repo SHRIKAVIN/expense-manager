@@ -26,6 +26,7 @@ export function profileToSession(row: DbProfile): SessionUser {
     role: row.role,
     currency: row.currency,
     themePreference: row.theme_preference as ThemePreference,
+    gender: row.gender === "male" || row.gender === "female" ? row.gender : undefined,
     createdAt: new Date(row.created_at).getTime(),
   };
 }

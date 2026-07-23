@@ -93,13 +93,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   if (!user) throw new Error("AppDataProvider requires an authenticated user");
 
   const effectiveRole: Role = isQuickSwitchViewOnly ? "Viewer" : user.role;
+  const repoUserKey = `${user.id}:${user.email}:${effectiveRole}:${user.currency}`;
   const repoUser = useMemo(
     () => (effectiveRole === user.role ? user : { ...user, role: effectiveRole }),
-    [user, effectiveRole],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [repoUserKey],
   );
   const repo = useMemo(() => createRepository(repoUser), [repoUser]);
   const cachedWorkspace = useMemo(() => readWorkspaceCache(user.id), [user.id]);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(() => Boolean(cachedWorkspace || user));
   const [categories, setCategories] = useState<Category[]>(() => cachedWorkspace?.categories ?? []);
   const [expenses, setExpenses] = useState<Expense[]>(() => cachedWorkspace?.expenses ?? []);
   const [income, setIncome] = useState<IncomeEntry[]>(() => cachedWorkspace?.income ?? []);
@@ -134,12 +136,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     const cached = readWorkspaceCache(user.id);
 
-    setReady(false);
-    setCategories(cached?.categories ?? []);
-    setExpenses(cached?.expenses ?? []);
-    setIncome(cached?.income ?? []);
-    setReimbursements(cached?.reimbursements ?? []);
-    setRecurring(cached?.recurring ?? []);
+    if (cached) {
+      setCategories(cached.categories ?? []);
+      setExpenses(cached.expenses ?? []);
+      setIncome(cached.income ?? []);
+      setReimbursements(cached.reimbursements ?? []);
+      setRecurring(cached.recurring ?? []);
+    }
 
     (async () => {
       try {
@@ -154,7 +157,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user.id, repo, refresh]);
+  }, [user.id, repoUserKey, repo, refresh]);
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {

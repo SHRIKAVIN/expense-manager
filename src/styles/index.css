@@ -184,23 +184,23 @@
   --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
 }
 
-/* Installed iPhone PWA: trust safe-area when available; use a smaller fallback + margin. */
+/* Installed iPhone PWA: trust safe-area when available. */
 html.pwa-standalone,
 html.ios.pwa-standalone {
-  --fab-bottom-safe: env(safe-area-inset-bottom, 12px);
+  --fab-bottom-safe: env(safe-area-inset-bottom, 0px);
   --fab-bottom-offset: calc(var(--fab-bottom-safe) + 0.375rem);
 }
 
 @media (display-mode: standalone) {
   :root {
-    --fab-bottom-safe: env(safe-area-inset-bottom, 12px);
+    --fab-bottom-safe: env(safe-area-inset-bottom, 0px);
     --fab-bottom-offset: calc(var(--fab-bottom-safe) + 0.375rem);
   }
 }
 
 html.pwa-standalone .auth-screen-inner,
 html.ios.pwa-standalone .auth-screen-inner {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 12px));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
 .app-header {

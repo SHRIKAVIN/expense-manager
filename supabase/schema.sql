@@ -8,6 +8,7 @@ create table if not exists public.profiles (
   role text not null default 'Owner' check (role in ('Owner', 'Member', 'Viewer')),
   currency text not null default 'INR',
   theme_preference text not null default 'system' check (theme_preference in ('light', 'dark', 'system')),
+  gender text check (gender is null or gender in ('male', 'female')),
   created_at timestamptz not null default now()
 );
 
@@ -109,13 +110,18 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email, display_name, role, currency)
+  insert into public.profiles (id, email, display_name, role, currency, gender)
   values (
     new.id,
     new.email,
     coalesce(new.raw_user_meta_data ->> 'display_name', split_part(new.email, '@', 1)),
     coalesce(new.raw_user_meta_data ->> 'role', 'Owner'),
-    coalesce(new.raw_user_meta_data ->> 'currency', 'INR')
+    coalesce(new.raw_user_meta_data ->> 'currency', 'INR'),
+    case
+      when lower(coalesce(new.raw_user_meta_data ->> 'gender', '')) in ('male', 'female')
+        then lower(new.raw_user_meta_data ->> 'gender')
+      else null
+    end
   );
   return new;
 end;
@@ -137,6 +143,7 @@ as $$
 declare
   u auth.users;
   row public.profiles;
+  g text;
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
@@ -149,14 +156,20 @@ begin
 
   select * into u from auth.users where id = auth.uid();
 
-  insert into public.profiles (id, email, display_name, role, currency, theme_preference)
+  g := lower(coalesce(u.raw_user_meta_data ->> 'gender', ''));
+  if g not in ('male', 'female') then
+    g := null;
+  end if;
+
+  insert into public.profiles (id, email, display_name, role, currency, theme_preference, gender)
   values (
     u.id,
     u.email,
     coalesce(u.raw_user_meta_data ->> 'display_name', split_part(u.email, '@', 1)),
     coalesce(u.raw_user_meta_data ->> 'role', 'Owner'),
     coalesce(u.raw_user_meta_data ->> 'currency', 'INR'),
-    'system'
+    'system',
+    g
   )
   returning * into row;
 

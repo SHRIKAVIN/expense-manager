@@ -27,7 +27,7 @@ import {
   readProfileCache,
   writeProfileCache,
 } from "@/lib/cache/userCache";
-import type { Role, SessionUser, ThemePreference, User } from "@/lib/types";
+import type { Gender, Role, SessionUser, ThemePreference, User } from "@/lib/types";
 
 interface SignupInput {
   email: string;
@@ -35,6 +35,7 @@ interface SignupInput {
   displayName: string;
   role: Role;
   currency: string;
+  gender: Gender;
 }
 
 interface AuthContextValue {
@@ -73,7 +74,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const applyUser = useCallback((profile: SessionUser) => {
     writeProfileCache(profile);
-    setUser(profile);
+    setUser((prev) => {
+      if (
+        prev &&
+        prev.id === profile.id &&
+        prev.email === profile.email &&
+        prev.displayName === profile.displayName &&
+        prev.role === profile.role &&
+        prev.currency === profile.currency &&
+        prev.themePreference === profile.themePreference
+      ) {
+        return prev;
+      }
+      return profile;
+    });
     setStatus("authed");
   }, []);
 
@@ -146,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           display_name: input.displayName.trim() || email.split("@")[0],
           role: input.role,
           currency: input.currency,
+          gender: input.gender,
         },
       },
     });
