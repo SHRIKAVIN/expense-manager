@@ -1,6 +1,6 @@
 import type { ReactElement, SVGProps } from "react";
 import { cn } from "@/lib/cn";
-import { isNavLottieIcon } from "@/components/NavLottieIcon";
+import { isNavLottieIcon } from "@/components/navLottieMarker";
 
 type IconComponent = (props: SVGProps<SVGSVGElement> & { size?: number }) => ReactElement;
 
@@ -44,8 +44,8 @@ interface IconBadge3DProps {
 }
 
 const badgeSizes = {
-  sm: { box: "h-8 w-8", icon: 26, stroke: 1.9 },
-  md: { box: "h-10 w-10", icon: 34, stroke: 2 },
+  sm: { box: "h-10 w-10", icon: 34, stroke: 1.9 },
+  md: { box: "h-12 w-12", icon: 42, stroke: 2 },
 } as const;
 
 /** Gradient tile badge with embossed icon — header / nav use. */

@@ -1,18 +1,13 @@
 import { useState } from "react";
-import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import { goToDashboard } from "./navigateHome";
+import { APP_NAV, currentRoute } from "./appNav";
 import { cn } from "@/lib/cn";
 import { Sheet } from "@/components/Sheet";
 import { IconBadge3D } from "@/components/EmbossedIcon";
-import {
-  BudgetsNavIcon,
-  DashboardNavIcon,
-  IncomeNavIcon,
-  InsightsNavIcon,
-  MenuNavIcon,
-  SettingsNavIcon,
-  TransactionsNavIcon,
-} from "@/components/NavLottieIcon";
+import { NavDragPicker } from "@/components/NavDragPicker";
+import { MenuNavIcon } from "@/components/NavLottieIcon";
 import { ProfileGenderIcon } from "@/components/ProfileGenderIcon";
 import { useAuth } from "@/auth/AuthProvider";
 import {
@@ -21,24 +16,8 @@ import {
   type QuickSwitchEmail,
 } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
+import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
 import type { Gender } from "@/lib/types";
-
-export const APP_NAV = [
-  { to: "/", label: "Dashboard", icon: DashboardNavIcon, end: true as const },
-  { to: "/transactions", label: "Transactions", icon: TransactionsNavIcon, end: false as const },
-  { to: "/income", label: "Income", icon: IncomeNavIcon, end: false as const },
-  { to: "/budgets", label: "Budgets", icon: BudgetsNavIcon, end: false as const },
-  { to: "/insights", label: "Insights", icon: InsightsNavIcon, end: false as const },
-  { to: "/settings", label: "Settings", icon: SettingsNavIcon, end: false as const },
-];
-
-function currentRoute(pathname: string) {
-  return (
-    APP_NAV.find((n) =>
-      n.end ? pathname === n.to : pathname === n.to || pathname.startsWith(`${n.to}/`),
-    ) ?? APP_NAV[0]
-  );
-}
 
 function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] }) {
   return <IconBadge3D icon={Icon} size="md" />;
@@ -54,16 +33,19 @@ export function HomeLogoButton({
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const reduced = usePrefersReducedMotion();
 
   return (
-    <button
+    <motion.button
       type="button"
       aria-label="Go to dashboard"
       onClick={() => goToDashboard(navigate, pathname)}
+      whileTap={reduced ? undefined : pressProps.whileTap}
+      transition={pressProps.transition}
       className={cn("shrink-0 outline-none", className)}
     >
       <PageIconBadge icon={Icon} />
-    </button>
+    </motion.button>
   );
 }
 
@@ -74,6 +56,7 @@ export function AppHeader() {
   const { user, canQuickSwitch, quickSwitchUsers, switchQuickUser, isQuickSwitchViewOnly } =
     useAuth();
   const { show } = useToast();
+  const reduced = usePrefersReducedMotion();
   const route = currentRoute(pathname);
   const title = route.label;
   const [switching, setSwitching] = useState(false);
@@ -111,13 +94,15 @@ export function AppHeader() {
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>
 
           {canQuickSwitch && (
-            <button
+            <motion.button
               type="button"
               aria-label="Switch profile"
               aria-expanded={profileOpen}
               data-testid="nav-header-profile-switch"
               disabled={switching}
               onClick={() => setProfileOpen(true)}
+              whileTap={reduced ? undefined : pressProps.whileTap}
+              transition={pressProps.transition}
               className={cn(
                 "relative h-10 w-10 flex items-center justify-center rounded-full outline-none shrink-0 border transition-colors",
                 isQuickSwitchViewOnly
@@ -132,19 +117,21 @@ export function AppHeader() {
                   aria-hidden
                 />
               )}
-            </button>
+            </motion.button>
           )}
 
-          <button
+          <motion.button
             type="button"
             aria-label="Open navigation menu"
             aria-expanded={menuOpen}
             data-testid="nav-menu-open"
             onClick={() => setMenuOpen(true)}
+            whileTap={reduced ? undefined : pressProps.whileTap}
+            transition={pressProps.transition}
             className="h-14 w-14 -mr-2 flex items-center justify-center rounded-md text-ink outline-none shrink-0"
           >
-            <MenuNavIcon size={60} />
-          </button>
+            <MenuNavIcon size={68} />
+          </motion.button>
         </div>
       </header>
 
@@ -163,14 +150,16 @@ export function AppHeader() {
             {quickSwitchUsers.map((acc) => {
               const active = user?.email.toLowerCase() === acc.email;
               return (
-                <button
+                <motion.button
                   key={acc.email}
                   type="button"
                   disabled={switching}
                   data-testid={`nav-profile-switch-${acc.name.toLowerCase()}`}
                   onClick={() => void handleQuickSwitch(acc.email)}
+                  whileTap={reduced || switching ? undefined : pressProps.whileTap}
+                  transition={pressProps.transition}
                   className={cn(
-                    "flex items-center gap-3 rounded-md px-4 py-3 text-left outline-none border transition-colors",
+                    "flex items-center gap-3 rounded-xl px-4 py-3 text-left outline-none border transition-colors",
                     active
                       ? "border-primary bg-primary/10 text-primary"
                       : "border-hairline bg-canvas text-ink hover:bg-canvas-parchment",
@@ -197,7 +186,7 @@ export function AppHeader() {
                   {active && (
                     <span className="text-caption text-primary shrink-0">Active</span>
                   )}
-                </button>
+                </motion.button>
               );
             })}
           </div>
@@ -205,38 +194,11 @@ export function AppHeader() {
       </Sheet>
 
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Navigate">
-        <nav className="flex flex-col gap-1 -mx-2" data-testid="nav-menu">
-          {APP_NAV.map(({ to, label, icon: Icon, end }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={end}
-              data-testid={`nav-link-${to === "/" ? "dashboard" : to.slice(1)}`}
-              onClick={() => setMenuOpen(false)}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-3 rounded-md px-3 py-3 text-body outline-none",
-                  isActive
-                    ? "bg-canvas-parchment text-primary"
-                    : "text-ink hover:bg-canvas-parchment/60",
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {isActive ? (
-                    <IconBadge3D icon={Icon} size="sm" />
-                  ) : (
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center text-ink-muted-80">
-                      <Icon size={28} strokeWidth={1.8} />
-                    </span>
-                  )}
-                  <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+        <NavDragPicker
+          pathname={pathname}
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+        />
       </Sheet>
     </>
   );

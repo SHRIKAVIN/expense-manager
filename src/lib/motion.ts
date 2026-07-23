@@ -25,6 +25,14 @@ export const pressProps = {
   transition: { type: "spring", stiffness: 600, damping: 30, mass: 0.5 } as Transition,
 };
 
+/** Softer liquid morph for nav active pills. */
+export const liquidSpring: Transition = {
+  type: "spring",
+  stiffness: 420,
+  damping: 34,
+  mass: 0.7,
+};
+
 export const sheetSpring: Transition = {
   type: "spring",
   stiffness: 300,

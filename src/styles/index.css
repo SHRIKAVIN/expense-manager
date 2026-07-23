@@ -164,6 +164,149 @@
       0 1px 2px rgba(0, 0, 0, 0.4),
       0 3px 8px rgba(0, 100, 200, 0.2);
   }
+
+  /**
+   * Morphing active indicator — liquid glass.
+   * Light: soft grey frosted chip. Dark: clear specular veil.
+   * Continuous shine sweep on the selected item.
+   */
+  .liquid-nav-pill {
+    overflow: hidden;
+    isolation: isolate;
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, #d8d8dc 42%, transparent) 0%,
+      color-mix(in srgb, #e8e8ed 28%, transparent) 50%,
+      color-mix(in srgb, #f0f0f4 18%, transparent) 100%
+    );
+    -webkit-backdrop-filter: saturate(180%) blur(18px);
+    backdrop-filter: saturate(180%) blur(18px);
+    border: 1px solid color-mix(in srgb, #c7c7cc 35%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #ffffff 70%, transparent),
+      inset 0 -0.5px 0 color-mix(in srgb, #000000 3%, transparent),
+      0 1px 3px color-mix(in srgb, #000000 4%, transparent);
+  }
+
+  .liquid-nav-pill::after {
+    content: "";
+    position: absolute;
+    inset: -40% -60%;
+    background: linear-gradient(
+      105deg,
+      transparent 36%,
+      color-mix(in srgb, #ffffff 55%, transparent) 48%,
+      color-mix(in srgb, #ffffff 75%, transparent) 50%,
+      color-mix(in srgb, #ffffff 55%, transparent) 52%,
+      transparent 64%
+    );
+    transform: translateX(-45%) rotate(8deg);
+    animation: liquid-nav-shine 2.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .liquid-nav-pill-active {
+    background: linear-gradient(
+      165deg,
+      color-mix(in srgb, #d0d0d5 48%, transparent) 0%,
+      color-mix(in srgb, #e4e4e9 32%, transparent) 50%,
+      color-mix(in srgb, #ececf0 22%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, #bdbdc2 40%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in srgb, #ffffff 75%, transparent),
+      inset 0 -0.5px 0 color-mix(in srgb, #000000 4%, transparent),
+      0 2px 8px color-mix(in srgb, #000000 5%, transparent);
+  }
+
+  .liquid-nav-pill-active::after {
+    animation-duration: 1.6s;
+    background: linear-gradient(
+      105deg,
+      transparent 34%,
+      color-mix(in srgb, #ffffff 65%, transparent) 47%,
+      color-mix(in srgb, #ffffff 90%, transparent) 50%,
+      color-mix(in srgb, #ffffff 65%, transparent) 53%,
+      transparent 66%
+    );
+  }
+
+  [data-theme="dark"] .liquid-nav-pill {
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.08) 45%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 0.5px rgba(255, 255, 255, 0.12),
+      0 10px 28px rgba(0, 0, 0, 0.2);
+  }
+
+  [data-theme="dark"] .liquid-nav-pill::after {
+    background: linear-gradient(
+      105deg,
+      transparent 36%,
+      rgba(255, 255, 255, 0.12) 46%,
+      rgba(255, 255, 255, 0.38) 50%,
+      rgba(255, 255, 255, 0.12) 54%,
+      transparent 64%
+    );
+  }
+
+  [data-theme="dark"] .liquid-nav-pill-active {
+    background: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.36) 0%,
+      rgba(255, 255, 255, 0.1) 48%,
+      rgba(255, 255, 255, 0.04) 100%
+    );
+    border-color: rgba(255, 255, 255, 0.38);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.08),
+      0 0 0 0.5px rgba(255, 255, 255, 0.16),
+      0 12px 32px rgba(0, 0, 0, 0.22);
+  }
+
+  [data-theme="dark"] .liquid-nav-pill-active::after {
+    background: linear-gradient(
+      105deg,
+      transparent 34%,
+      rgba(255, 255, 255, 0.18) 46%,
+      rgba(255, 255, 255, 0.5) 50%,
+      rgba(255, 255, 255, 0.18) 54%,
+      transparent 66%
+    );
+  }
+
+  @keyframes liquid-nav-shine {
+    0% {
+      transform: translateX(-55%) rotate(8deg);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    55% {
+      opacity: 1;
+    }
+    70%,
+    100% {
+      transform: translateX(55%) rotate(8deg);
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .liquid-nav-pill::after {
+      animation: none;
+      display: none;
+    }
+  }
 }
 
 @supports (background: color-mix(in srgb, red, blue)) {

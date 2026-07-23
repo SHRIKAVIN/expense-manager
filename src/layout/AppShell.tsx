@@ -10,12 +10,13 @@ import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { getQuickSwitchAccountName } from "@/auth/quickSwitch";
 import { getIncomeSelectedMonth } from "@/lib/incomeUiState";
-import { usePrefersReducedMotion } from "@/lib/motion";
+import { liquidSpring, pressProps, usePrefersReducedMotion } from "@/lib/motion";
 import { useToast } from "@/components/Toast";
 import { clearAppBadge } from "@/lib/appBadge";
 import { ProfileGenderIcon } from "@/components/ProfileGenderIcon";
 import { ScrolledContext } from "./scroll";
-import { AppHeader, APP_NAV, HomeLogoButton } from "./AppHeader";
+import { AppHeader, HomeLogoButton } from "./AppHeader";
+import { APP_NAV, type AppNavItem } from "./appNav";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -86,9 +87,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <HomeLogoButton icon={HomeIcon} />
               <span className="text-tagline text-ink">Expenses</span>
             </div>
-            <nav className="flex flex-col gap-1">
+            <nav className="relative flex flex-col gap-1">
               {APP_NAV.map((item) => (
-                <RailLink key={item.to} {...item} />
+                <RailLink key={item.to} {...item} reduced={reduced} />
               ))}
             </nav>
           </div>
@@ -101,13 +102,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               {quickSwitchUsers.map((acc) => {
                 const active = user?.email.toLowerCase() === acc.email;
                 return (
-                  <button
+                  <motion.button
                     key={acc.email}
                     type="button"
                     disabled={active}
                     onClick={() => void switchQuickUser(acc.email)}
+                    whileTap={reduced || active ? undefined : pressProps.whileTap}
+                    transition={pressProps.transition}
                     className={cn(
-                      "flex items-center gap-2 rounded-md px-3 py-2 text-caption font-medium outline-none transition-all w-full text-left",
+                      "flex items-center gap-2 rounded-xl px-3 py-2 text-caption font-medium outline-none transition-colors w-full text-left",
                       active
                         ? "bg-primary text-on-primary"
                         : "text-ink hover:bg-canvas border border-transparent",
@@ -115,7 +118,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <ProfileGenderIcon gender={acc.gender} size={28} />
                     <span className="truncate flex-1">{acc.name}</span>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
@@ -170,29 +173,48 @@ function RailLink({
   label,
   icon: Icon,
   end,
+  reduced,
 }: {
   to: string;
   label: string;
-  icon: (typeof APP_NAV)[number]["icon"];
+  icon: AppNavItem["icon"];
   end?: boolean;
+  reduced: boolean;
 }) {
   return (
     <NavLink
       to={to}
       end={end}
       data-testid={`nav-rail-${to === "/" ? "dashboard" : to.slice(1)}`}
-      className={({ isActive }) =>
-        cn(
-          "flex items-center gap-3 rounded-md px-3 py-2.5 text-body outline-none",
-          isActive ? "text-primary" : "text-ink-muted-80",
-        )
-      }
+      className="relative block outline-none"
     >
       {({ isActive }) => (
-        <>
-          <Icon size={30} strokeWidth={isActive ? 2.1 : 1.8} />
-          <span className={isActive ? "text-body-strong" : "text-body"}>{label}</span>
-        </>
+        <motion.span
+          className={cn(
+            "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-body",
+            isActive ? "text-primary" : "text-ink-muted-80",
+          )}
+          whileTap={reduced ? undefined : pressProps.whileTap}
+          transition={pressProps.transition}
+        >
+          {isActive && (
+            <motion.span
+              layoutId={reduced ? undefined : "desktop-rail-pill"}
+              className="liquid-nav-pill absolute inset-0 rounded-xl"
+              transition={reduced ? { duration: 0 } : liquidSpring}
+            />
+          )}
+          <motion.span
+            className="relative"
+            animate={reduced ? undefined : { scale: isActive ? 1.06 : 1 }}
+            transition={liquidSpring}
+          >
+            <Icon size={38} strokeWidth={isActive ? 2.1 : 1.8} />
+          </motion.span>
+          <span className={cn("relative", isActive ? "text-body-strong" : "text-body")}>
+            {label}
+          </span>
+        </motion.span>
       )}
     </NavLink>
   );
