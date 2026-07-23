@@ -5,8 +5,14 @@ import { useLottie } from "lottie-react";
 import { usePrefersReducedMotion } from "@/lib/motion";
 import successAnimation from "@/assets/lottie/success.json";
 import deleteAnimation from "@/assets/lottie/delete-success.json";
+import reimbursementPaidAnimation from "@/assets/lottie/reimbursement-paid.json";
+import reimbursementReceivedAnimation from "@/assets/lottie/reimbursement-received.json";
 
-export type SuccessOverlayVariant = "added" | "deleted";
+export type SuccessOverlayVariant =
+  | "added"
+  | "deleted"
+  | "reimbursement_paid"
+  | "reimbursement_received";
 
 interface SuccessOverlayProps {
   open: boolean;
@@ -28,12 +34,34 @@ const VARIANT = {
     defaultTitle: "Expense added",
     accent: "var(--color-primary)",
     testId: "expense-success-overlay",
+    dismissMs: AUTO_DISMISS_MS,
+    lottieSize: LOTTIE_SIZE,
   },
   deleted: {
     animation: deleteAnimation,
     defaultTitle: "Expense deleted",
     accent: "#ff3c00",
     testId: "expense-delete-overlay",
+    dismissMs: AUTO_DISMISS_MS,
+    lottieSize: LOTTIE_SIZE,
+  },
+  /** Sylvia/Kavin marks a reimbursement paid (thank-you bow). */
+  reimbursement_paid: {
+    animation: reimbursementPaidAnimation,
+    defaultTitle: "Marked paid",
+    accent: "#3e8257",
+    testId: "reimbursement-paid-overlay",
+    dismissMs: 2600,
+    lottieSize: 260,
+  },
+  /** Requester confirms they received the money (coin rain). */
+  reimbursement_received: {
+    animation: reimbursementReceivedAnimation,
+    defaultTitle: "Money received",
+    accent: "#f5a623",
+    testId: "reimbursement-received-overlay",
+    dismissMs: 3200,
+    lottieSize: 260,
   },
 } as const;
 
@@ -195,9 +223,14 @@ export function SuccessOverlay({
 
   useEffect(() => {
     if (!open) return;
-    const id = window.setTimeout(onClose, reduced ? REDUCED_DISMISS_MS : AUTO_DISMISS_MS);
+    const id = window.setTimeout(
+      onClose,
+      reduced ? REDUCED_DISMISS_MS : config.dismissMs,
+    );
     return () => window.clearTimeout(id);
-  }, [open, onClose, reduced]);
+  }, [open, onClose, reduced, config.dismissMs]);
+
+  const size = config.lottieSize;
 
   return createPortal(
     <AnimatePresence>
@@ -216,14 +249,14 @@ export function SuccessOverlay({
         >
           <motion.div
             className="relative z-10 flex items-center justify-center"
-            style={{ width: LOTTIE_SIZE, height: LOTTIE_SIZE }}
+            style={{ width: size, height: size }}
             initial={reduced ? false : { scale: 0.86, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: reduced ? 0 : 0.28, ease: "easeOut" }}
           >
             <SuccessIconEffects reduced={reduced} accent={config.accent} />
             <div className="relative z-10">
-              <SuccessLottie size={LOTTIE_SIZE} animationData={config.animation} />
+              <SuccessLottie size={size} animationData={config.animation} />
             </div>
           </motion.div>
           <motion.div
