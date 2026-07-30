@@ -5,13 +5,13 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { Screen, ScreenHeader } from "@/layout/Screen";
 import { Card } from "@/components/Card";
+import { ChartFrame } from "@/components/ChartFrame";
 import { EmptyState } from "@/components/EmptyState";
 import { SegmentedControl, type Segment } from "@/components/SegmentedControl";
 import { useAppData } from "@/data/AppDataProvider";
@@ -92,9 +92,14 @@ export function InsightsScreen() {
               onChange={setRange}
             />
           </div>
-          <div className="h-56 -ml-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+          <ChartFrame className="h-56 -ml-2">
+            {(width, height) => (
+              <AreaChart
+                width={width}
+                height={height}
+                data={trend}
+                margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+              >
                 <CartesianGrid stroke="var(--color-divider-soft)" vertical={false} />
                 <XAxis
                   dataKey="label"
@@ -131,8 +136,8 @@ export function InsightsScreen() {
                   isAnimationActive
                 />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
+            )}
+          </ChartFrame>
         </Card>
 
         <Card>
@@ -159,9 +164,11 @@ export function InsightsScreen() {
           {categoryBars.length === 0 ? (
             <p className="text-body text-ink-muted-48">No spending this month yet.</p>
           ) : (
-            <div className="h-64 -ml-2">
-              <ResponsiveContainer width="100%" height="100%">
+            <ChartFrame className="h-64 -ml-2">
+              {(width, height) => (
                 <BarChart
+                  width={width}
+                  height={height}
                   data={categoryBars}
                   layout="vertical"
                   margin={{ top: 0, right: 8, bottom: 0, left: 8 }}
@@ -202,8 +209,8 @@ export function InsightsScreen() {
                     isAnimationActive
                   />
                 </BarChart>
-              </ResponsiveContainer>
-            </div>
+              )}
+            </ChartFrame>
           )}
         </Card>
 

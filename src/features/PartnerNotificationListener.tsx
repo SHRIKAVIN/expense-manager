@@ -5,7 +5,7 @@ import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/notifications";
 import { incrementAppBadgeForNotification, syncAppBadgeFromStore } from "@/lib/appBadge";
 import { partnerAlertsEnabled } from "@/lib/partnerNotify";
-import { registerWebPushSubscription, webPushSupported } from "@/lib/webPush";
+import { registerWebPushSubscription, shouldAttemptWebPushRegistration } from "@/lib/webPush";
 import { useAppData } from "@/data/AppDataProvider";
 
 const SEEN_PREFIX = "em.notifications.seen.";
@@ -59,7 +59,7 @@ export function PartnerNotificationListener() {
     const email = user.email.toLowerCase();
     const sb = getSupabase();
 
-    if (Notification.permission === "granted" && webPushSupported()) {
+    if (shouldAttemptWebPushRegistration()) {
       void registerWebPushSubscription(user.id).catch((err) => {
         console.warn("Push subscription failed:", err);
       });

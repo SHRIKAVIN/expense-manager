@@ -1,5 +1,6 @@
 import {
   BudgetsNavIcon,
+  CalculatorNavIcon,
   DashboardNavIcon,
   IncomeNavIcon,
   InsightsNavIcon,
@@ -13,6 +14,7 @@ export const APP_NAV = [
   { to: "/income", label: "Income", icon: IncomeNavIcon, end: false as const },
   { to: "/budgets", label: "Budgets", icon: BudgetsNavIcon, end: false as const },
   { to: "/insights", label: "Insights", icon: InsightsNavIcon, end: false as const },
+  { to: "/calculator", label: "Calculator", icon: CalculatorNavIcon, end: false as const },
   { to: "/settings", label: "Settings", icon: SettingsNavIcon, end: false as const },
 ];
 

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { IconBadge3D } from "@/components/EmbossedIcon";
 import { APP_NAV } from "@/layout/appNav";
+import { useAppData } from "@/data/AppDataProvider";
 import { liquidSpring, pressProps, usePrefersReducedMotion } from "@/lib/motion";
 
 interface NavDragPickerProps {
@@ -45,6 +46,7 @@ function indexFromPointerY(
  */
 export function NavDragPicker({ pathname, open, onClose }: NavDragPickerProps) {
   const navigate = useNavigate();
+  const { refresh } = useAppData();
   const reduced = usePrefersReducedMotion();
   const [focus, setFocus] = useState(() => routeIndex(pathname));
   const [dragging, setDragging] = useState(false);
@@ -75,7 +77,11 @@ export function NavDragPicker({ pathname, open, onClose }: NavDragPickerProps) {
     const item = APP_NAV[index];
     if (!item) return;
     onClose();
-    if (item.to !== pathname) navigate(item.to);
+    if (item.to !== pathname) {
+      navigate(item.to);
+    } else {
+      void refresh();
+    }
   };
 
   const onPointerDown = (e: React.PointerEvent<HTMLButtonElement>, index: number) => {

@@ -16,6 +16,7 @@ import {
   type QuickSwitchEmail,
 } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
+import { useAppData } from "@/data/AppDataProvider";
 import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
 import type { Gender } from "@/lib/types";
 
@@ -33,13 +34,14 @@ export function HomeLogoButton({
 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { refresh } = useAppData();
   const reduced = usePrefersReducedMotion();
 
   return (
     <motion.button
       type="button"
       aria-label="Go to dashboard"
-      onClick={() => goToDashboard(navigate, pathname)}
+      onClick={() => goToDashboard(navigate, pathname, () => void refresh())}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
       className={cn("shrink-0 outline-none", className)}

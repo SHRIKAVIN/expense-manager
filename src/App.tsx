@@ -10,6 +10,7 @@ import { TransactionsScreen } from "@/screens/TransactionsScreen";
 import { BudgetsScreen } from "@/screens/BudgetsScreen";
 import { IncomeScreen } from "@/screens/IncomeScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
+import { CalculatorScreen } from "@/screens/CalculatorScreen";
 import { AuthScreen } from "@/screens/AuthScreen";
 
 // Recharts is heavy — keep it out of the initial bundle and load on demand.
@@ -20,6 +21,8 @@ const DevScreen = lazy(() =>
   import("@/screens/DevScreen").then((m) => ({ default: m.DevScreen })),
 );
 import { PartnerNotificationListener } from "@/features/PartnerNotificationListener";
+import { NavigationDataSync } from "@/features/NavigationDataSync";
+import { ReimbursementSyncListener } from "@/features/ReimbursementSyncListener";
 import { BudgetAlerts } from "@/features/BudgetAlerts";
 import { AppLogoMark } from "@/components/AppLogoMark";
 import { notify } from "@/lib/notifications";
@@ -66,6 +69,8 @@ function AuthedApp() {
     <>
       <RecurringReminders />
       <BudgetAlerts />
+      <NavigationDataSync />
+      <ReimbursementSyncListener />
       <PartnerNotificationListener />
       <AppShell>
         <Suspense fallback={<Splash />}>
@@ -75,6 +80,7 @@ function AuthedApp() {
             <Route path="/income" element={<IncomeScreen />} />
             <Route path="/budgets" element={<BudgetsScreen />} />
             <Route path="/insights" element={<InsightsScreen />} />
+            <Route path="/calculator" element={<CalculatorScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
             <Route path="*" element={<DashboardScreen />} />
           </Routes>

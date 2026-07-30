@@ -23,6 +23,15 @@ export function vapidConfigured(): boolean {
   return Boolean(VAPID_PUBLIC_KEY);
 }
 
+/** True when auto-registering push on app load is expected to succeed. */
+export function shouldAttemptWebPushRegistration(): boolean {
+  if (!webPushSupported() || Notification.permission !== "granted") return false;
+  const isIos = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (isIos && !isStandalonePwa()) return false;
+  if (import.meta.env.DEV && !navigator.serviceWorker.controller) return false;
+  return true;
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");

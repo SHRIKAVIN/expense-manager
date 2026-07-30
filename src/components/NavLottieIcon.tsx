@@ -15,6 +15,7 @@ import budgetsAnimation from "@/assets/lottie/nav-budgets.json";
 import insightsAnimation from "@/assets/lottie/nav-insights.json";
 import settingsAnimation from "@/assets/lottie/nav-settings.json";
 import menuAnimation from "@/assets/lottie/nav-menu.json";
+import calculatorAnimation from "@/assets/lottie/nav-calculator.json";
 
 export type { NavIconProps } from "@/components/navLottieMarker";
 
@@ -101,3 +102,4 @@ export const BudgetsNavIcon = createNavLottieIcon(budgetsAnimation, 1.6);
 export const InsightsNavIcon = createNavLottieIcon(insightsAnimation, 1.7, 0.4);
 export const SettingsNavIcon = createNavLottieIcon(settingsAnimation, 1.7);
 export const MenuNavIcon = createNavLottieIcon(menuAnimation, 1.95, 0.65);
+export const CalculatorNavIcon = createNavLottieIcon(calculatorAnimation, 1.4, 0.5);

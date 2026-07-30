@@ -23,7 +23,7 @@ const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
 const INCOME_FAB_ROUTE = "/income";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { can } = useAppData();
+  const { can, refresh } = useAppData();
   const { isQuickSwitchViewOnly, user, canQuickSwitch, quickSwitchUsers, switchQuickUser } = useAuth();
   const { show } = useToast();
   const location = useLocation();
@@ -89,7 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
             <nav className="relative flex flex-col gap-1">
               {APP_NAV.map((item) => (
-                <RailLink key={item.to} {...item} reduced={reduced} />
+                <RailLink key={item.to} {...item} reduced={reduced} onRefresh={() => void refresh()} />
               ))}
             </nav>
           </div>
@@ -139,9 +139,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <AppHeader />
             <motion.div
               key={location.pathname}
-              initial={reduced ? false : { opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: reduced ? 0 : 0.15, ease: "easeOut" }}
+              initial={reduced ? false : { opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: reduced ? 0 : 0.18, ease: "easeOut" }}
             >
               {children}
             </motion.div>
@@ -174,12 +174,14 @@ function RailLink({
   icon: Icon,
   end,
   reduced,
+  onRefresh,
 }: {
   to: string;
   label: string;
   icon: AppNavItem["icon"];
   end?: boolean;
   reduced: boolean;
+  onRefresh: () => void;
 }) {
   return (
     <NavLink
@@ -187,6 +189,12 @@ function RailLink({
       end={end}
       data-testid={`nav-rail-${to === "/" ? "dashboard" : to.slice(1)}`}
       className="relative block outline-none"
+      onClick={(e) => {
+        if (e.currentTarget.getAttribute("aria-current") === "page") {
+          e.preventDefault();
+          onRefresh();
+        }
+      }}
     >
       {({ isActive }) => (
         <motion.span

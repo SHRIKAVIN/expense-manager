@@ -28,6 +28,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     }
   };
 
+  const totalOwed = reimbursementsToPay.reduce((sum, req) => sum + req.amount, 0);
+
   return (
     <>
       {reimbursementsToPay.length > 0 ? (
@@ -39,6 +41,22 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
               their account.
             </p>
           </div>
+
+          {/* Total summary banner */}
+          <div className="flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 px-4 py-3">
+            <div>
+              <p className="text-caption text-ink-muted-48">
+                {reimbursementsToPay.length === 1
+                  ? "1 pending refund"
+                  : `${reimbursementsToPay.length} pending refunds`}
+              </p>
+              <p className="text-caption-strong text-ink mt-0.5">Total to refund</p>
+            </div>
+            <p className="text-tagline text-primary font-semibold">
+              {formatCurrency(totalOwed, currency)}
+            </p>
+          </div>
+
           {reimbursementsToPay.map((req) => (
             <div
               key={req.id}
