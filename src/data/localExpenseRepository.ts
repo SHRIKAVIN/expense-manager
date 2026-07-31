@@ -17,14 +17,10 @@ import type {
   SessionUser,
 } from "@/lib/types";
 import { monthKey } from "@/lib/format";
+import { advanceRecurringDate } from "@/lib/recurringDate";
 
 function advanceDate(iso: string, frequency: RecurringFrequency): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  if (frequency === "weekly") date.setDate(date.getDate() + 7);
-  else if (frequency === "monthly") date.setMonth(date.getMonth() + 1);
-  else date.setFullYear(date.getFullYear() + 1);
-  return date.toISOString().slice(0, 10);
+  return advanceRecurringDate(iso, frequency);
 }
 
 /** IndexedDB-backed repository (offline fallback when Supabase is not configured). */
@@ -156,11 +152,17 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         paymentMethod: input.paymentMethod?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
         receiptId: input.receiptId,
+        recurringId: input.recurringId,
+        recurringPeriod: input.recurringPeriod,
         createdAt: now,
         updatedAt: now,
       };
       await db.expenses.add(exp);
       if (input.requestReimbursement) {
+        const reimbAmount =
+          input.requestReimbursement.amount != null && input.requestReimbursement.amount > 0
+            ? input.requestReimbursement.amount
+            : exp.amount;
         const reimb: ReimbursementRequest = {
           id: uid("reimb"),
           expenseId: exp.id,
@@ -168,7 +170,7 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
           requesterName: input.requestReimbursement.requesterName,
           payerEmail: input.requestReimbursement.payerEmail.toLowerCase(),
           payerName: input.requestReimbursement.payerName,
-          amount: exp.amount,
+          amount: reimbAmount,
           merchant: exp.merchant,
           status: "pending",
           createdAt: now,
@@ -204,6 +206,10 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (patch.clearReimbursement && existingReimb?.status === "pending") {
         await db.reimbursements.delete(existingReimb.id);
       } else if (requestReimbursement && !existingReimb) {
+        const reimbAmount =
+          requestReimbursement.amount != null && requestReimbursement.amount > 0
+            ? requestReimbursement.amount
+            : next.amount;
         await db.reimbursements.add({
           id: uid("reimb"),
           expenseId: id,
@@ -211,14 +217,18 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
           requesterName: requestReimbursement.requesterName,
           payerEmail: requestReimbursement.payerEmail.toLowerCase(),
           payerName: requestReimbursement.payerName,
-          amount: next.amount,
+          amount: reimbAmount,
           merchant: next.merchant,
           status: "pending",
           createdAt: Date.now(),
         });
       } else if (existingReimb?.status === "pending") {
+        const reimbAmount =
+          requestReimbursement?.amount != null && requestReimbursement.amount > 0
+            ? requestReimbursement.amount
+            : next.amount;
         await db.reimbursements.update(existingReimb.id, {
-          amount: next.amount,
+          amount: reimbAmount,
           merchant: next.merchant,
         });
       }
@@ -340,7 +350,7 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       const payerExpense: Expense = {
         id: uid("exp"),
         userId: payer.id,
-        amount: exp.amount,
+        amount: req.amount,
         merchant: exp.merchant,
         categoryId: payerCategoryId,
         date: exp.date,
@@ -352,7 +362,12 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         updatedAt: now,
       };
       await db.expenses.add(payerExpense);
-      await db.expenses.update(exp.id, { excludedFromTotals: true, updatedAt: now });
+      const remaining = exp.amount - req.amount;
+      if (remaining <= 0.009) {
+        await db.expenses.update(exp.id, { excludedFromTotals: true, updatedAt: now });
+      } else {
+        await db.expenses.update(exp.id, { amount: remaining, updatedAt: now });
+      }
       await db.reimbursements.update(id, {
         status: "completed",
         completedAt: now,

@@ -29,7 +29,6 @@ export function HomeLogoButton({
   icon: Icon,
 }: {
   className?: string;
-  /** Page icon for the header badge; tap still goes to dashboard. */
   icon: (typeof APP_NAV)[number]["icon"];
 }) {
   const navigate = useNavigate();
@@ -140,11 +139,7 @@ export function AppHeader() {
         </div>
       </header>
 
-      <Sheet
-        open={profileOpen}
-        onClose={() => setProfileOpen(false)}
-        title="Switch profile"
-      >
+      <Sheet open={profileOpen} onClose={() => setProfileOpen(false)} title="Switch profile">
         <div className="flex flex-col gap-3" data-testid="nav-profile-switch-sheet">
           <p className="text-caption text-ink-muted-48">
             {isQuickSwitchViewOnly

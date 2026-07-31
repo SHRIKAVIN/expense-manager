@@ -56,6 +56,9 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [requestReimbursement, setRequestReimbursement] = useState(false);
+  /** How much of the bill the partner owes when requesting reimbursement. */
+  const [splitMode, setSplitMode] = useState<"full" | "half" | "custom">("full");
+  const [customPartnerShare, setCustomPartnerShare] = useState("");
   const [receiptId, setReceiptId] = useState<string | undefined>(undefined);
   /** New receipt not yet uploaded — preview locally, persist on save. */
   const [pendingReceipt, setPendingReceipt] = useState<string | null>(null);
@@ -82,6 +85,22 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setPendingReceipt(null);
       const activeReimb = reimbursementByExpenseId[editing.id];
       setRequestReimbursement(Boolean(activeReimb));
+      if (activeReimb && editing.amount > 0) {
+        const ratio = activeReimb.amount / editing.amount;
+        if (Math.abs(ratio - 1) < 0.01) {
+          setSplitMode("full");
+          setCustomPartnerShare("");
+        } else if (Math.abs(ratio - 0.5) < 0.01) {
+          setSplitMode("half");
+          setCustomPartnerShare("");
+        } else {
+          setSplitMode("custom");
+          setCustomPartnerShare(String(activeReimb.amount));
+        }
+      } else {
+        setSplitMode("full");
+        setCustomPartnerShare("");
+      }
       if (editing.receiptId) {
         repo.getReceipt(editing.receiptId).then((r) => setReceiptPreview(r?.dataUrl ?? null));
       } else {
@@ -95,6 +114,8 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setPaymentMethod("");
       setNotes("");
       setRequestReimbursement(false);
+      setSplitMode("full");
+      setCustomPartnerShare("");
       setReceiptId(undefined);
       setPendingReceipt(null);
       setReceiptPreview(null);
@@ -139,6 +160,20 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
     const amt = Number(amount);
     if (!amount || Number.isNaN(amt) || amt <= 0) next.amount = "Enter an amount greater than 0";
     if (!categoryId) next.category = "Pick a category";
+
+    let partnerShare = amt;
+    if (requestReimbursement && reimbursementPartner) {
+      if (splitMode === "half") partnerShare = Math.round(amt * 50) / 100;
+      else if (splitMode === "custom") {
+        partnerShare = Number(customPartnerShare);
+        if (!customPartnerShare || Number.isNaN(partnerShare) || partnerShare <= 0) {
+          next.amount = next.amount ?? "Enter partner’s share";
+        } else if (partnerShare >= amt) {
+          next.amount = "Partner share must be less than the total";
+        }
+      }
+    }
+
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -158,6 +193,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
               payerEmail: reimbursementPartner.email,
               payerName: reimbursementPartner.name,
               requesterName: user?.displayName || user?.email.split("@")[0] || "User",
+              amount: partnerShare,
             }
           : undefined;
 
@@ -169,14 +205,24 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         paymentMethod: paymentMethod.trim() || undefined,
         notes: notes.trim() || undefined,
         receiptId: finalReceiptId,
-        requestReimbursement: !editing ? reimbPayload : reimbPayload && !existingReimbursement ? reimbPayload : undefined,
+        requestReimbursement: !editing
+          ? reimbPayload
+          : reimbPayload && !existingReimbursement
+            ? reimbPayload
+            : reimbPayload && existingReimbursement?.status === "pending"
+              ? reimbPayload
+              : undefined,
         clearReimbursement:
           Boolean(editing && existingReimbursement?.status === "pending" && !requestReimbursement),
       };
       if (editing) {
         await editExpense(editing.id, payload);
         if (reimbPayload && !existingReimbursement) {
-          show(`Expense updated — ${reimbursementPartner!.name} will be notified to reimburse`);
+          show(
+            splitMode === "full"
+              ? `Expense updated — ${reimbursementPartner!.name} will be notified to reimburse`
+              : `Split saved — ${reimbursementPartner!.name} owes ${formatCurrency(partnerShare, user?.currency)}`,
+          );
         } else {
           show("Expense updated");
         }
@@ -188,7 +234,9 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           amountLabel: formatCurrency(amt, user?.currency),
           detail:
             requestReimbursement && reimbursementPartner
-              ? `${reimbursementPartner.name} will be notified to reimburse`
+              ? splitMode === "full"
+                ? `${reimbursementPartner.name} will be notified to reimburse`
+                : `Split with ${reimbursementPartner.name} — they owe ${formatCurrency(partnerShare, user?.currency)}`
               : undefined,
         });
       }
@@ -256,46 +304,88 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         </div>
 
         {reimbursementPartner && (
-          <button
-            type="button"
-            disabled={reimbursementLocked}
-            onClick={() => !reimbursementLocked && setRequestReimbursement(!requestReimbursement)}
-            className={cn(
-              "flex w-full flex-col text-left rounded-md px-4 py-3.5 transition-all outline-none",
-              reimbursementLocked
-                ? "opacity-80 cursor-not-allowed border border-hairline bg-canvas"
-                : requestReimbursement
-                ? "border-2 border-primary bg-primary/10 text-primary"
-                : "border border-hairline bg-canvas hover:bg-canvas-parchment/60 text-ink",
-            )}
-            data-testid="expense-reimbursement-toggle"
-          >
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-3">
+            <button
+              type="button"
+              disabled={reimbursementLocked}
+              onClick={() => !reimbursementLocked && setRequestReimbursement(!requestReimbursement)}
+              className={cn(
+                "flex w-full flex-col text-left rounded-md px-4 py-3.5 transition-all outline-none",
+                reimbursementLocked
+                  ? "opacity-80 cursor-not-allowed border border-hairline bg-canvas"
+                  : requestReimbursement
+                  ? "border-2 border-primary bg-primary/10 text-primary"
+                  : "border border-hairline bg-canvas hover:bg-canvas-parchment/60 text-ink",
+              )}
+              data-testid="expense-reimbursement-toggle"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span
+                  className={cn(
+                    "text-body-strong block",
+                    requestReimbursement ? "text-primary font-semibold" : "text-ink",
+                  )}
+                >
+                  Split / get reimbursed
+                </span>
+                {requestReimbursement && (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary text-xs font-bold">
+                    ✓
+                  </span>
+                )}
+              </div>
               <span
                 className={cn(
-                  "text-body-strong block",
-                  requestReimbursement ? "text-primary font-semibold" : "text-ink",
+                  "text-caption mt-1 block",
+                  requestReimbursement ? "text-primary/90" : "text-ink-muted-48",
                 )}
               >
-                Request reimbursement
+                {reimbursementLocked
+                  ? `${existingReimbursement!.payerName} marked this paid — confirm on the dashboard.`
+                  : `Ask ${reimbursementPartner.name} to cover their share. Full reimburse, 50/50, or custom.`}
               </span>
-              {requestReimbursement && (
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-on-primary text-xs font-bold">
-                  ✓
-                </span>
-              )}
-            </div>
-            <span
-              className={cn(
-                "text-caption mt-1 block",
-                requestReimbursement ? "text-primary/90" : "text-ink-muted-48",
-              )}
-            >
-              {reimbursementLocked
-                ? `${existingReimbursement!.payerName} marked this paid — confirm on the dashboard.`
-                : `Ask ${reimbursementPartner.name} to pay you back. After they mark paid, you confirm receipt and the expense is removed.`}
-            </span>
-          </button>
+            </button>
+
+            {requestReimbursement && !reimbursementLocked && (
+              <div className="flex flex-col gap-3 rounded-md border border-hairline bg-canvas-parchment/40 px-4 py-3">
+                <span className="text-caption-strong text-ink-muted-80">Partner’s share</span>
+                <div className="flex flex-wrap gap-2" data-testid="expense-split-modes">
+                  {(
+                    [
+                      { id: "full" as const, label: "Full amount" },
+                      { id: "half" as const, label: "50 / 50" },
+                      { id: "custom" as const, label: "Custom" },
+                    ] as const
+                  ).map((opt) => (
+                    <Chip
+                      key={opt.id}
+                      selected={splitMode === opt.id}
+                      onClick={() => setSplitMode(opt.id)}
+                    >
+                      {opt.label}
+                    </Chip>
+                  ))}
+                </div>
+                {splitMode === "half" && Number(amount) > 0 && (
+                  <p className="text-caption text-ink-muted-48">
+                    {reimbursementPartner.name} owes{" "}
+                    {formatCurrency(Math.round(Number(amount) * 50) / 100, user?.currency)} · you keep{" "}
+                    {formatCurrency(Number(amount) - Math.round(Number(amount) * 50) / 100, user?.currency)}
+                  </p>
+                )}
+                {splitMode === "custom" && (
+                  <TextField
+                    label="Amount they owe"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={customPartnerShare}
+                    onChange={(e) => setCustomPartnerShare(e.target.value)}
+                    data-testid="expense-split-custom"
+                  />
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         <TextField

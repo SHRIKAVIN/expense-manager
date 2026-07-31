@@ -13,7 +13,7 @@ import {
   readWorkspaceCache,
   writeWorkspaceCache,
 } from "@/lib/cache/userCache";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, monthKey, todayISO } from "@/lib/format";
 import { expensesForTotals as filterExpensesForTotals } from "@/lib/analytics";
 import { notifyPush } from "@/lib/notifications";
 import {
@@ -23,6 +23,13 @@ import {
   notifyPartnerReimbursementRejected,
   notifyPartnerReimbursementUpdated,
 } from "@/lib/partnerNotify";
+import {
+  enqueueOfflineOp,
+  flushOfflineOps,
+  listOfflineOps,
+  shouldQueueWrites,
+} from "@/lib/offlineQueue";
+import { advanceRecurringDate } from "@/lib/recurringDate";
 import type {
   Category,
   Expense,
@@ -52,6 +59,8 @@ interface AppDataContextValue {
   reimbursementsToPay: ReimbursementRequest[];
   recurring: Recurring[];
   categoriesById: Record<string, Category>;
+  /** Count of expense writes waiting to sync while offline. */
+  pendingSyncCount: number;
   // permissions surfaced to the UI (and re-enforced in the repo layer)
   can: {
     writeExpenses: boolean;
@@ -63,6 +72,8 @@ interface AppDataContextValue {
   addExpense: (input: ExpenseInput) => Promise<void>;
   editExpense: (id: string, patch: Partial<ExpenseInput>) => Promise<void>;
   removeExpense: (id: string) => Promise<void>;
+  /** One-tap log a recurring rule as an expense and advance nextDue. */
+  logRecurring: (id: string) => Promise<void>;
   addIncome: (input: IncomeInput) => Promise<void>;
   removeIncome: (id: string) => Promise<void>;
   markReimbursementPaid: (id: string) => Promise<void>;
@@ -110,6 +121,11 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     () => cachedWorkspace?.reimbursements ?? [],
   );
   const [recurring, setRecurring] = useState<Recurring[]>(() => cachedWorkspace?.recurring ?? []);
+  const [pendingSyncCount, setPendingSyncCount] = useState(() => listOfflineOps(user.id).length);
+
+  const refreshPendingSync = useCallback(() => {
+    setPendingSyncCount(listOfflineOps(user.id).length);
+  }, [user.id]);
 
   const refresh = useCallback(async () => {
     const [cats, exps, inc, reimb, recs] = await Promise.all([
@@ -132,6 +148,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       recurring: recs,
     });
   }, [repo, user.id]);
+
+  const syncOfflineQueue = useCallback(async () => {
+    if (shouldQueueWrites()) return;
+    const { flushed } = await flushOfflineOps(user.id, repo);
+    refreshPendingSync();
+    if (flushed > 0) await refresh();
+  }, [repo, user.id, refresh, refreshPendingSync]);
+
+  useEffect(() => {
+    const onOnline = () => {
+      void syncOfflineQueue();
+    };
+    window.addEventListener("online", onOnline);
+    void syncOfflineQueue();
+    return () => window.removeEventListener("online", onOnline);
+  }, [syncOfflineQueue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -162,6 +194,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const addExpense = useCallback(
     async (input: ExpenseInput) => {
+      if (shouldQueueWrites()) {
+        if (input.receiptId || input.requestReimbursement) {
+          throw new Error("Receipts and splits need a connection — try again when online.");
+        }
+        enqueueOfflineOp(user.id, "createExpense", input);
+        const now = Date.now();
+        const optimistic: Expense = {
+          id: `local_${now}`,
+          userId: user.id,
+          amount: input.amount,
+          merchant: input.merchant.trim() || "Untitled",
+          categoryId: input.categoryId,
+          date: input.date,
+          paymentMethod: input.paymentMethod,
+          notes: input.notes,
+          recurringId: input.recurringId,
+          recurringPeriod: input.recurringPeriod,
+          createdAt: now,
+          updatedAt: now,
+        };
+        setExpenses((prev) => [optimistic, ...prev]);
+        refreshPendingSync();
+        return;
+      }
       const created = await repo.createExpense(input);
       await refresh();
       const amount = formatCurrency(created.amount, user.currency);
@@ -172,10 +228,30 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
       void notifyPartnerExpenseAdded(user, created, Boolean(input.requestReimbursement));
     },
-    [repo, refresh, user],
+    [repo, refresh, user, refreshPendingSync],
   );
   const editExpense = useCallback(
     async (id: string, patch: Partial<ExpenseInput>) => {
+      if (shouldQueueWrites()) {
+        if (patch.receiptId || patch.requestReimbursement || patch.clearReimbursement) {
+          throw new Error("Receipts and splits need a connection — try again when online.");
+        }
+        enqueueOfflineOp(user.id, "updateExpense", { id, patch });
+        setExpenses((prev) =>
+          prev.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  ...patch,
+                  merchant: patch.merchant?.trim() ?? e.merchant,
+                  updatedAt: Date.now(),
+                }
+              : e,
+          ),
+        );
+        refreshPendingSync();
+        return;
+      }
       const existingReimb = reimbursements.find(
         (r) => r.expenseId === id && r.status !== "completed",
       );
@@ -195,23 +271,63 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       if (
         existingReimb?.status === "pending" &&
         !patch.clearReimbursement &&
-        (patch.amount !== undefined || patch.merchant !== undefined)
+        (patch.amount !== undefined ||
+          patch.merchant !== undefined ||
+          patch.requestReimbursement?.amount !== undefined)
       ) {
         void notifyPartnerReimbursementUpdated(user, {
           ...existingReimb,
-          amount: patch.amount ?? existingReimb.amount,
+          amount: patch.requestReimbursement?.amount ?? patch.amount ?? existingReimb.amount,
           merchant: patch.merchant ?? existingReimb.merchant,
         });
       }
     },
-    [repo, refresh, reimbursements, user],
+    [repo, refresh, reimbursements, user, refreshPendingSync],
   );
   const removeExpense = useCallback(
     async (id: string) => {
+      if (shouldQueueWrites()) {
+        enqueueOfflineOp(user.id, "deleteExpense", { id });
+        setExpenses((prev) => prev.filter((e) => e.id !== id));
+        refreshPendingSync();
+        return;
+      }
       await repo.deleteExpense(id);
       await refresh();
     },
-    [repo, refresh],
+    [repo, refresh, user.id, refreshPendingSync],
+  );
+
+  const logRecurring = useCallback(
+    async (id: string) => {
+      const rule = recurring.find((r) => r.id === id);
+      if (!rule) throw new Error("Recurring expense not found.");
+      const period = `${monthKey(rule.nextDue)}:${rule.nextDue}`;
+      const already = expenses.some(
+        (e) => e.recurringId === rule.id && e.recurringPeriod === period,
+      );
+      if (already) throw new Error("Already logged for this period.");
+
+      await addExpense({
+        amount: rule.amount,
+        merchant: rule.merchant,
+        categoryId: rule.categoryId,
+        date: todayISO(),
+        paymentMethod: rule.paymentMethod,
+        notes: rule.notes,
+        recurringId: rule.id,
+        recurringPeriod: period,
+      });
+
+      const nextDue = advanceRecurringDate(rule.nextDue, rule.frequency);
+      if (shouldQueueWrites()) {
+        setRecurring((prev) => prev.map((r) => (r.id === id ? { ...r, nextDue } : r)));
+      } else {
+        await repo.updateRecurring(id, { nextDue } as Partial<Recurring>);
+        await refresh();
+      }
+    },
+    [recurring, expenses, addExpense, repo, refresh],
   );
   const addIncome = useCallback(
     async (input: IncomeInput) => {
@@ -399,11 +515,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       reimbursementsToPay,
       recurring,
       categoriesById,
+      pendingSyncCount,
       can,
       refresh,
       addExpense,
       editExpense,
       removeExpense,
+      logRecurring,
       addIncome,
       removeIncome,
       markReimbursementPaid,
@@ -429,11 +547,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       reimbursementsToPay,
       recurring,
       categoriesById,
+      pendingSyncCount,
       can,
       refresh,
       addExpense,
       editExpense,
       removeExpense,
+      logRecurring,
       addIncome,
       removeIncome,
       markReimbursementPaid,

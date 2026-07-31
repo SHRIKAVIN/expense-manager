@@ -25,7 +25,9 @@ import {
   yearlyTrend,
   filterByMonth,
   sum,
+  sumIncome,
 } from "@/lib/analytics";
+import { Chip } from "@/components/Chip";
 import { currentMonthKey, formatCurrency, isOverallPeriod, monthLabel, shiftMonthKey } from "@/lib/format";
 import { ChartIcon } from "@/lib/icons";
 
@@ -40,9 +42,11 @@ const RANGE_SEGMENTS: Segment<Range>[] = [
 export function InsightsScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, expensesForTotals, categoriesById } = useAppData();
+  const { expenses, expensesForTotals, income, categoriesById } = useAppData();
   const [range, setRange] = useState<Range>("month");
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+  const [whatIfCategoryId, setWhatIfCategoryId] = useState<string | "all">("all");
+  const [whatIfCutPct, setWhatIfCutPct] = useState(20);
 
   const minMonth = useMemo(() => {
     if (expenses.length === 0) return undefined;
@@ -86,6 +90,24 @@ export function InsightsScreen() {
   const previousMonthLabel = monthLabel(shiftMonthKey(momCurrentKey, -1));
   const currentPeriodLabel = monthLabel(momCurrentKey);
   const selectedPeriodLabel = monthLabel(selectedMonth);
+  const monthIncomeTotal = useMemo(
+    () => sumIncome(income, selectedMonth),
+    [income, selectedMonth],
+  );
+  const spentTotal = useMemo(() => sum(monthExpenses), [monthExpenses]);
+  const remainingNow = monthIncomeTotal - spentTotal;
+
+  const whatIf = useMemo(() => {
+    const cutRatio = whatIfCutPct / 100;
+    const categorySpend =
+      whatIfCategoryId === "all"
+        ? spentTotal
+        : sum(monthExpenses.filter((e) => e.categoryId === whatIfCategoryId));
+    const saved = categorySpend * cutRatio;
+    const newSpent = spentTotal - saved;
+    const newRemaining = monthIncomeTotal - newSpent;
+    return { saved, newSpent, newRemaining, categorySpend };
+  }, [whatIfCutPct, whatIfCategoryId, spentTotal, monthExpenses, monthIncomeTotal]);
 
   const tooltipFormatter = (value: unknown) => formatCurrency(Number(value), currency);
 
@@ -194,6 +216,77 @@ export function InsightsScreen() {
             </div>
           </div>
         </Card>
+
+        {categoryBars.length > 0 && (
+          <Card data-testid="insights-what-if">
+            <p className="text-tagline text-ink mb-1">What if…</p>
+            <p className="text-body text-ink-muted-48 mb-4">
+              Cut spending and see the impact on remaining
+            </p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              <Chip
+                selected={whatIfCategoryId === "all"}
+                onClick={() => setWhatIfCategoryId("all")}
+              >
+                All spend
+              </Chip>
+              {categoryBars.slice(0, 6).map((s) => (
+                <Chip
+                  key={s.categoryId}
+                  selected={whatIfCategoryId === s.categoryId}
+                  onClick={() => setWhatIfCategoryId(s.categoryId)}
+                >
+                  {s.name}
+                </Chip>
+              ))}
+            </div>
+            <label className="flex flex-col gap-2 mb-4">
+              <span className="text-caption-strong text-ink-muted-80">
+                Cut {whatIfCutPct}%
+                {whatIfCategoryId !== "all" && categoriesById[whatIfCategoryId]
+                  ? ` of ${categoriesById[whatIfCategoryId].name}`
+                  : ""}
+              </span>
+              <input
+                type="range"
+                min={0}
+                max={50}
+                step={5}
+                value={whatIfCutPct}
+                onChange={(e) => setWhatIfCutPct(Number(e.target.value))}
+                className="w-full accent-[var(--color-primary)]"
+                data-testid="insights-what-if-slider"
+              />
+            </label>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-body text-ink-muted-80">You’d save</span>
+                <span className="text-body-strong text-emerald-600 tabular-nums">
+                  {formatCurrency(whatIf.saved, currency)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-body text-ink-muted-80">New spent</span>
+                <span className="text-body-strong text-ink tabular-nums">
+                  {formatCurrency(whatIf.newSpent, currency)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-ink/10 pt-2">
+                <span className="text-body-strong text-ink">Remaining</span>
+                <span
+                  className={`text-body-strong tabular-nums ${
+                    whatIf.newRemaining >= 0 ? "text-emerald-600" : "text-red-600"
+                  }`}
+                >
+                  {formatCurrency(whatIf.newRemaining, currency)}
+                  <span className="text-caption text-ink-muted-48 font-normal ml-2">
+                    (now {formatCurrency(remainingNow, currency)})
+                  </span>
+                </span>
+              </div>
+            </div>
+          </Card>
+        )}
 
         <Card>
           <p className="text-tagline text-ink mb-5">

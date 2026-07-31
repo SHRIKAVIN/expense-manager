@@ -1,4 +1,5 @@
 import { Sheet } from "@/components/Sheet";
+import { Button } from "@/components/Button";
 import { CategoryGlyph } from "@/lib/icons";
 import { formatCurrency, formatDate, relativeDue } from "@/lib/format";
 import type { Category, Recurring } from "@/lib/types";
@@ -8,6 +9,9 @@ interface RecurringDetailSheetProps {
   category?: Category;
   currency: string;
   onClose: () => void;
+  onLog?: () => void;
+  onDismiss?: () => void;
+  logging?: boolean;
 }
 
 const FREQ_LABEL: Record<Recurring["frequency"], string> = {
@@ -21,11 +25,34 @@ export function RecurringDetailSheet({
   category,
   currency,
   onClose,
+  onLog,
+  onDismiss,
+  logging,
 }: RecurringDetailSheetProps) {
   const open = recurring !== null;
 
   return (
-    <Sheet open={open} onClose={onClose} title={recurring?.merchant ?? "Recurring"}>
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={recurring?.merchant ?? "Recurring"}
+      footer={
+        onLog || onDismiss ? (
+          <div className="flex flex-col gap-2">
+            {onLog && (
+              <Button variant="primary" fullWidth onClick={onLog} disabled={logging}>
+                {logging ? "Logging…" : `Log ${recurring?.merchant ?? "expense"}`}
+              </Button>
+            )}
+            {onDismiss && (
+              <Button variant="secondary" fullWidth onClick={onDismiss} disabled={logging}>
+                Dismiss
+              </Button>
+            )}
+          </div>
+        ) : undefined
+      }
+    >
       {recurring && (
         <div className="flex flex-col items-center text-center gap-4">
           <div className="text-center">

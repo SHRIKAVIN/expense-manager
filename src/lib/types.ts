@@ -88,11 +88,19 @@ export interface ExpenseInput {
   paymentMethod?: string;
   notes?: string;
   receiptId?: string;
+  /** Set when logging from a recurring rule (idempotency). */
+  recurringId?: string;
+  recurringPeriod?: string;
   /** When set, creates a pending reimbursement request for the partner to pay back. */
   requestReimbursement?: {
     payerEmail: string;
     payerName: string;
     requesterName: string;
+    /**
+     * Amount the partner owes. Defaults to the full expense amount.
+     * Use a lower value for splits (e.g. 50% of the bill you paid).
+     */
+    amount?: number;
   };
   /** When true on update, removes a pending reimbursement request for this expense. */
   clearReimbursement?: boolean;

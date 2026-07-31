@@ -42,7 +42,7 @@ import { listItemVariants } from "@/lib/motion";
 export function DashboardScreen() {
   const { user } = useAuth();
   const currency = user?.currency ?? "INR";
-  const { expenses, expensesForTotals, income, categories, categoriesById, recurring, removeExpense, refresh } =
+  const { expenses, expensesForTotals, income, categories, categoriesById, recurring, removeExpense, refresh, logRecurring } =
     useAppData();
   const { show } = useToast();
 
@@ -54,6 +54,7 @@ export function DashboardScreen() {
   } | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
   const [viewingRecurring, setViewingRecurring] = useState<Recurring | null>(null);
+  const [loggingRecurringId, setLoggingRecurringId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [refreshing, setRefreshing] = useState(false);
   const [summaryKind, setSummaryKind] = useState<DashboardSummaryKind | null>(null);
@@ -233,31 +234,22 @@ export function DashboardScreen() {
             exit="exit"
             className="mt-4"
           >
-            <Card className="flex items-center gap-3" padded={false}>
+            <Card
+              className="flex items-center gap-3"
+              padded={false}
+              onPress={() => setViewingRecurring(r)}
+            >
               <div className="flex items-center gap-3 p-4 flex-1 min-w-0">
-                <button
-                  type="button"
-                  className="flex items-center gap-3 flex-1 min-w-0 text-left outline-none"
-                  onClick={() => setViewingRecurring(r)}
-                >
-                  <div className="h-10 w-10 rounded-sm bg-canvas-parchment flex items-center justify-center text-primary shrink-0">
-                    <RepeatIcon size={20} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-body-strong text-ink flex items-baseline gap-1 min-w-0">
-                      <span className="truncate">{r.merchant}</span>
-                      <span className="shrink-0">— {formatCurrency(r.amount, currency)}</span>
-                    </p>
-                    <p className="text-caption text-ink-muted-48">{relativeDue(r.nextDue)}</p>
-                  </div>
-                </button>
-                <Button
-                  variant="secondary"
-                  className="px-4 py-2 shrink-0"
-                  onClick={() => setDismissedDue((d) => [...d, r.id])}
-                >
-                  Dismiss
-                </Button>
+                <div className="h-10 w-10 rounded-sm bg-canvas-parchment flex items-center justify-center text-primary shrink-0">
+                  <RepeatIcon size={20} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-body-strong text-ink flex items-baseline gap-1 min-w-0">
+                    <span className="truncate">{r.merchant}</span>
+                    <span className="shrink-0">— {formatCurrency(r.amount, currency)}</span>
+                  </p>
+                  <p className="text-caption text-ink-muted-48">{relativeDue(r.nextDue)}</p>
+                </div>
               </div>
             </Card>
           </motion.div>
@@ -350,6 +342,34 @@ export function DashboardScreen() {
           viewingRecurring ? categoriesById[viewingRecurring.categoryId] : undefined
         }
         currency={currency}
+        logging={loggingRecurringId === viewingRecurring?.id}
+        onLog={
+          viewingRecurring
+            ? () => {
+                const id = viewingRecurring.id;
+                void (async () => {
+                  setLoggingRecurringId(id);
+                  try {
+                    await logRecurring(id);
+                    show(`Logged ${viewingRecurring.merchant}`);
+                    setViewingRecurring(null);
+                  } catch (err) {
+                    show(err instanceof Error ? err.message : "Could not log expense");
+                  } finally {
+                    setLoggingRecurringId(null);
+                  }
+                })();
+              }
+            : undefined
+        }
+        onDismiss={
+          viewingRecurring
+            ? () => {
+                setDismissedDue((d) => [...d, viewingRecurring.id]);
+                setViewingRecurring(null);
+              }
+            : undefined
+        }
         onClose={() => setViewingRecurring(null)}
       />
       <ConfirmDialog

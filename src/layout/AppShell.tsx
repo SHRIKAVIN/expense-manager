@@ -17,6 +17,7 @@ import { ProfileGenderIcon } from "@/components/ProfileGenderIcon";
 import { ScrolledContext } from "./scroll";
 import { AppHeader, HomeLogoButton } from "./AppHeader";
 import { APP_NAV, type AppNavItem } from "./appNav";
+import { OfflineSyncBanner } from "@/features/OfflineSyncBanner";
 
 // The add-expense FAB only belongs where capturing a new expense is in context.
 const EXPENSE_FAB_ROUTES = ["/", "/transactions", "/budgets"];
@@ -140,6 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             )}
           >
             <AppHeader />
+            <OfflineSyncBanner />
             <motion.div
               key={location.pathname}
               initial={reduced ? false : { opacity: 0, y: 6 }}

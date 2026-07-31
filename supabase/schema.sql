@@ -301,7 +301,7 @@ begin
   )
   values (
     payer_id,
-    exp.amount,
+    req.amount,
     exp.merchant,
     payer_category_id,
     exp.date,
@@ -317,9 +317,16 @@ begin
   )
   returning id into new_payer_expense_id;
 
-  update public.expenses
-  set excluded_from_totals = true, updated_at = now_ts
-  where id = req.expense_id and user_id = req.requester_id;
+  -- Full reimbursement: hide requester expense. Split: keep their remaining share.
+  if exp.amount - req.amount <= 0.009 then
+    update public.expenses
+    set excluded_from_totals = true, updated_at = now_ts
+    where id = req.expense_id and user_id = req.requester_id;
+  else
+    update public.expenses
+    set amount = exp.amount - req.amount, updated_at = now_ts
+    where id = req.expense_id and user_id = req.requester_id;
+  end if;
 
   update public.reimbursement_requests
   set status = 'completed',

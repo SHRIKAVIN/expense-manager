@@ -8,6 +8,7 @@ import {
   toRecurring,
 } from "@/lib/supabase/mappers";
 import { monthKey } from "@/lib/format";
+import { advanceRecurringDate } from "@/lib/recurringDate";
 import { DEFAULT_CATEGORIES } from "./defaults";
 import {
   RepositoryError,
@@ -18,12 +19,7 @@ import {
 import type { Expense, ExpenseInput, RecurringFrequency, SessionUser } from "@/lib/types";
 
 function advanceDate(iso: string, frequency: RecurringFrequency): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  if (frequency === "weekly") date.setDate(date.getDate() + 7);
-  else if (frequency === "monthly") date.setMonth(date.getMonth() + 1);
-  else date.setFullYear(date.getFullYear() + 1);
-  return date.toISOString().slice(0, 10);
+  return advanceRecurringDate(iso, frequency);
 }
 
 function throwDb(message: string, code: RepositoryError["code"] = "validation"): never {
@@ -203,6 +199,8 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
           payment_method: input.paymentMethod?.trim() || null,
           notes: input.notes?.trim() || null,
           receipt_id: input.receiptId ?? null,
+          recurring_id: input.recurringId ?? null,
+          recurring_period: input.recurringPeriod ?? null,
           created_at: now,
           updated_at: now,
         })
@@ -212,13 +210,17 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       const expense = toExpense(data);
 
       if (input.requestReimbursement) {
+        const reimbAmount =
+          input.requestReimbursement.amount != null && input.requestReimbursement.amount > 0
+            ? input.requestReimbursement.amount
+            : expense.amount;
         const { error: reimbErr } = await sb().from("reimbursement_requests").insert({
           expense_id: expense.id,
           requester_id: userId,
           payer_email: input.requestReimbursement.payerEmail.toLowerCase(),
           payer_name: input.requestReimbursement.payerName,
           requester_name: input.requestReimbursement.requesterName,
-          amount: expense.amount,
+          amount: reimbAmount,
           merchant: expense.merchant,
           status: "pending",
         });
@@ -272,21 +274,29 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       if (patch.clearReimbursement && existingReimb?.status === "pending") {
         await sb().from("reimbursement_requests").delete().eq("id", existingReimb.id);
       } else if (patch.requestReimbursement && !existingReimb) {
+        const reimbAmount =
+          patch.requestReimbursement.amount != null && patch.requestReimbursement.amount > 0
+            ? patch.requestReimbursement.amount
+            : expense.amount;
         const { error: reimbErr } = await sb().from("reimbursement_requests").insert({
           expense_id: expense.id,
           requester_id: userId,
           payer_email: patch.requestReimbursement.payerEmail.toLowerCase(),
           payer_name: patch.requestReimbursement.payerName,
           requester_name: patch.requestReimbursement.requesterName,
-          amount: expense.amount,
+          amount: reimbAmount,
           merchant: expense.merchant,
           status: "pending",
         });
         if (reimbErr) throwDb(reimbErr.message);
       } else if (existingReimb && existingReimb.status === "pending") {
+        const reimbAmount =
+          patch.requestReimbursement?.amount != null && patch.requestReimbursement.amount > 0
+            ? patch.requestReimbursement.amount
+            : expense.amount;
         const { error: reimbUpdateErr } = await sb()
           .from("reimbursement_requests")
-          .update({ amount: expense.amount, merchant: expense.merchant })
+          .update({ amount: reimbAmount, merchant: expense.merchant })
           .eq("id", existingReimb.id);
         if (reimbUpdateErr) throwDb(reimbUpdateErr.message);
       }
