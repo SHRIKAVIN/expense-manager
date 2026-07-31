@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { RecurringDetailSheet } from "@/features/RecurringDetailSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { MonthPicker } from "@/components/MonthPicker";
@@ -28,14 +29,14 @@ import {
   sum,
   sumIncome,
 } from "@/lib/analytics";
-import { currentMonthKey, formatCurrency, listMonthKeys, monthLabel, relativeDue, shiftMonthKey } from "@/lib/format";
+import { currentMonthKey, formatCurrency, listMonthKeys, monthLabel, relativeDue, shiftMonthKey, isOverallPeriod } from "@/lib/format";
 import {
   AlertIcon,
   ListIcon,
   RefreshIcon,
   RepeatIcon,
 } from "@/lib/icons";
-import type { Expense } from "@/lib/types";
+import type { Expense, Recurring } from "@/lib/types";
 import { listItemVariants } from "@/lib/motion";
 
 export function DashboardScreen() {
@@ -52,6 +53,7 @@ export function DashboardScreen() {
     detail?: string;
   } | null>(null);
   const [dismissedDue, setDismissedDue] = useState<string[]>([]);
+  const [viewingRecurring, setViewingRecurring] = useState<Recurring | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
   const [refreshing, setRefreshing] = useState(false);
   const [summaryKind, setSummaryKind] = useState<DashboardSummaryKind | null>(null);
@@ -71,23 +73,11 @@ export function DashboardScreen() {
   }, [minMonth]);
 
   useEffect(() => {
+    if (isOverallPeriod(selectedMonth)) return;
     if (!availableMonths.includes(selectedMonth)) {
-      setSelectedMonth(availableMonths[availableMonths.length - 1] ?? currentMonthKey());
+      setSelectedMonth(availableMonths[0] ?? currentMonthKey());
     }
   }, [availableMonths, selectedMonth]);
-
-  useEffect(() => {
-    if (expenses.length === 0) return;
-    const hasInMonth = expenses.some((e) => e.date.slice(0, 7) === selectedMonth);
-    if (!hasInMonth) {
-      const latest = expenses.reduce(
-        (max, e) => (e.date.slice(0, 7) > max ? e.date.slice(0, 7) : max),
-        expenses[0].date.slice(0, 7),
-      );
-      setSelectedMonth(latest);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-sync when expenses change
-  }, [expenses]);
 
   const monthExpenses = useMemo(
     () => filterByMonth(expenses, selectedMonth),
@@ -125,7 +115,10 @@ export function DashboardScreen() {
   }, [budgeted, monthExpensesForTotals]);
 
   const monthIncomeEntries = useMemo(
-    () => income.filter((e) => e.month === selectedMonth),
+    () =>
+      isOverallPeriod(selectedMonth)
+        ? [...income].sort((a, b) => b.month.localeCompare(a.month) || b.createdAt - a.createdAt)
+        : income.filter((e) => e.month === selectedMonth),
     [income, selectedMonth],
   );
 
@@ -212,7 +205,11 @@ export function DashboardScreen() {
         >
           <CountUp value={totalSpent} currency={currency} className="text-amber-700" />
         </SummaryStatCard>
-        <SummaryStatCard label="Remaining" data-testid="dashboard-summary-remaining">
+        <SummaryStatCard
+          label="Remaining"
+          data-testid="dashboard-summary-remaining"
+          onPress={() => setSummaryKind("remaining")}
+        >
           <CountUp
             value={netRemaining}
             currency={currency}
@@ -238,18 +235,25 @@ export function DashboardScreen() {
           >
             <Card className="flex items-center gap-3" padded={false}>
               <div className="flex items-center gap-3 p-4 flex-1 min-w-0">
-                <div className="h-10 w-10 rounded-sm bg-canvas-parchment flex items-center justify-center text-primary shrink-0">
-                  <RepeatIcon size={20} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-body-strong text-ink truncate">
-                    {r.merchant} — {formatCurrency(r.amount, currency)}
-                  </p>
-                  <p className="text-caption text-ink-muted-48">{relativeDue(r.nextDue)}</p>
-                </div>
+                <button
+                  type="button"
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left outline-none"
+                  onClick={() => setViewingRecurring(r)}
+                >
+                  <div className="h-10 w-10 rounded-sm bg-canvas-parchment flex items-center justify-center text-primary shrink-0">
+                    <RepeatIcon size={20} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-body-strong text-ink flex items-baseline gap-1 min-w-0">
+                      <span className="truncate">{r.merchant}</span>
+                      <span className="shrink-0">— {formatCurrency(r.amount, currency)}</span>
+                    </p>
+                    <p className="text-caption text-ink-muted-48">{relativeDue(r.nextDue)}</p>
+                  </div>
+                </button>
                 <Button
                   variant="secondary"
-                  className="px-4 py-2"
+                  className="px-4 py-2 shrink-0"
                   onClick={() => setDismissedDue((d) => [...d, r.id])}
                 >
                   Dismiss
@@ -289,8 +293,8 @@ export function DashboardScreen() {
             />
           </Card>
 
-          {/* Budget health */}
-          {budgeted.length > 0 && (
+          {/* Budget health — monthly budgets only make sense for a single month */}
+          {budgeted.length > 0 && !isOverallPeriod(selectedMonth) && (
             <Card data-testid="dashboard-budget" onPress={() => setSummaryKind("budget")}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-tagline text-ink">Budget health</p>
@@ -340,6 +344,14 @@ export function DashboardScreen() {
       )}
 
       <ExpenseSheet open={!!editing} editing={editing} onClose={() => setEditing(null)} />
+      <RecurringDetailSheet
+        recurring={viewingRecurring}
+        category={
+          viewingRecurring ? categoriesById[viewingRecurring.categoryId] : undefined
+        }
+        currency={currency}
+        onClose={() => setViewingRecurring(null)}
+      />
       <ConfirmDialog
         open={!!confirmTarget}
         title="Delete expense?"
@@ -369,6 +381,7 @@ export function DashboardScreen() {
         spentTotal={totalSpent}
         expenseCount={monthExpensesForTotals.length}
         slices={slices}
+        remainingTotal={netRemaining}
         budgeted={budgeted}
         budgetSpentByCategory={budgetSpentByCategory}
         budgetTotals={budgetTotals}

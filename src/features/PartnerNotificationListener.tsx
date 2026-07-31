@@ -72,6 +72,9 @@ export function PartnerNotificationListener() {
       seenRef.current.add(row.id);
       markSeen(user.id, row.id);
 
+      // Always refresh workspace data (owed cards, etc.) even without push permission.
+      void refresh();
+
       if (document.visibilityState !== "visible") {
         void incrementAppBadgeForNotification(row.id);
       }
@@ -80,7 +83,6 @@ export function PartnerNotificationListener() {
       if (document.visibilityState === "visible") {
         void notifyPush(row.title, row.body);
       }
-      void refresh();
     };
 
     // Seed seen ids from recent rows — do not re-alert on mount (Realtime handles new inserts).

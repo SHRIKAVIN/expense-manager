@@ -116,6 +116,13 @@ export function monthKey(iso: string): string {
   return iso.slice(0, 7); // yyyy-mm
 }
 
+/** Sentinel value for “all time” in month pickers. */
+export const OVERALL_MONTH_KEY = "all";
+
+export function isOverallPeriod(key: string): boolean {
+  return key === OVERALL_MONTH_KEY;
+}
+
 export function currentMonthKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -141,11 +148,17 @@ export function listMonthKeys(from: string, to: string): string[] {
 }
 
 export function monthLabel(key: string): string {
+  if (isOverallPeriod(key)) return "Overall";
   const [y, m] = key.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, 1).toLocaleDateString(undefined, {
     month: "long",
     year: "numeric",
   });
+}
+
+/** Display label for a period key (`all` → Overall, else month name). */
+export function periodLabel(key: string): string {
+  return monthLabel(key);
 }
 
 export function daysUntil(iso: string): number {

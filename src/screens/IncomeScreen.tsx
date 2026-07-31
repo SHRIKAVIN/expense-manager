@@ -8,7 +8,7 @@ import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { sumIncome } from "@/lib/analytics";
-import { currentMonthKey, formatCurrency, formatDateTime } from "@/lib/format";
+import { currentMonthKey, formatCurrency, formatDateTime, isOverallPeriod, monthLabel } from "@/lib/format";
 import { setIncomeSelectedMonth } from "@/lib/incomeUiState";
 import { PlusIcon, TrashIcon } from "@/lib/icons";
 import type { IncomeEntry } from "@/lib/types";
@@ -23,7 +23,10 @@ export function IncomeScreen() {
   const [confirmTarget, setConfirmTarget] = useState<IncomeEntry | null>(null);
 
   useEffect(() => {
-    setIncomeSelectedMonth(selectedMonth);
+    // FAB always adds to a concrete month — fall back to current when Overall is selected.
+    setIncomeSelectedMonth(
+      isOverallPeriod(selectedMonth) ? currentMonthKey() : selectedMonth,
+    );
   }, [selectedMonth]);
 
   const minMonth = useMemo(() => {
@@ -35,7 +38,10 @@ export function IncomeScreen() {
   }, [income]);
 
   const monthIncome = useMemo(
-    () => income.filter((e) => e.month === selectedMonth),
+    () =>
+      isOverallPeriod(selectedMonth)
+        ? [...income].sort((a, b) => b.month.localeCompare(a.month) || b.createdAt - a.createdAt)
+        : income.filter((e) => e.month === selectedMonth),
     [income, selectedMonth],
   );
   const monthTotal = useMemo(() => sumIncome(income, selectedMonth), [income, selectedMonth]);
@@ -56,7 +62,9 @@ export function IncomeScreen() {
       </div>
 
       <Card className="mb-6" data-testid="income-month-total">
-        <p className="text-tagline text-ink-muted-80 mb-1">Total income this month</p>
+        <p className="text-tagline text-ink-muted-80 mb-1">
+          {isOverallPeriod(selectedMonth) ? "Total income · Overall" : "Total income this month"}
+        </p>
         <p className="text-display-md text-ink">{formatCurrency(monthTotal, currency)}</p>
       </Card>
 
@@ -81,7 +89,9 @@ export function IncomeScreen() {
                   {entry.label?.trim() || "Income"}
                 </p>
                 <p className="text-caption text-ink-muted-48">
-                  Added {formatDateTime(entry.createdAt)}
+                  {isOverallPeriod(selectedMonth)
+                    ? `${monthLabel(entry.month)} · Added ${formatDateTime(entry.createdAt)}`
+                    : `Added ${formatDateTime(entry.createdAt)}`}
                 </p>
               </div>
               <span className="text-body-strong text-ink tabular-nums shrink-0">
@@ -108,7 +118,7 @@ export function IncomeScreen() {
         title="Remove income?"
         message={
           confirmTarget
-            ? `${formatCurrency(confirmTarget.amount, currency)} will be removed from ${selectedMonth}.`
+            ? `${formatCurrency(confirmTarget.amount, currency)} will be removed from ${monthLabel(confirmTarget.month)}.`
             : undefined
         }
         confirmLabel="Remove"

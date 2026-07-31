@@ -1,6 +1,12 @@
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
-import { currentMonthKey, listMonthKeys, monthLabel, shiftMonthKey } from "@/lib/format";
+import {
+  currentMonthKey,
+  listMonthKeys,
+  monthLabel,
+  OVERALL_MONTH_KEY,
+  shiftMonthKey,
+} from "@/lib/format";
 import { ChevronDownIcon } from "@/lib/icons";
 
 interface MonthPickerProps {
@@ -8,12 +14,21 @@ interface MonthPickerProps {
   onChange: (monthKey: string) => void;
   /** Earliest month available in the list (yyyy-mm). */
   minMonth?: string;
+  /** Include an “Overall” (all-time) option. Defaults to true. */
+  includeOverall?: boolean;
   className?: string;
   "data-testid"?: string;
 }
 
 /** Native `<select>` month picker — uses the OS dropdown/wheel on mobile. */
-export function MonthPicker({ value, onChange, minMonth, className, "data-testid": testId }: MonthPickerProps) {
+export function MonthPicker({
+  value,
+  onChange,
+  minMonth,
+  includeOverall = true,
+  className,
+  "data-testid": testId,
+}: MonthPickerProps) {
   const months = useMemo(() => {
     const to = currentMonthKey();
     const from = minMonth ?? shiftMonthKey(to, -23);
@@ -29,6 +44,9 @@ export function MonthPicker({ value, onChange, minMonth, className, "data-testid
         data-testid={testId}
         className="appearance-none rounded-md border border-hairline bg-surface-pearl pl-3.5 pr-10 py-2.5 text-body text-ink outline-none focus:ring-2 focus:ring-primary-focus"
       >
+        {includeOverall && (
+          <option value={OVERALL_MONTH_KEY}>Overall</option>
+        )}
         {months.map((key) => (
           <option key={key} value={key}>
             {monthLabel(key)}

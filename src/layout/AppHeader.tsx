@@ -90,7 +90,10 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="lg:hidden sticky top-0 z-40 shrink-0 border-b border-hairline glass app-header">
+      <header
+        className="lg:hidden sticky top-0 z-40 shrink-0 border-b border-hairline glass app-header"
+        style={{ paddingTop: "max(env(safe-area-inset-top), 0px)" }}
+      >
         <div className="flex h-[var(--app-header-bar)] items-center gap-3 px-4">
           <HomeLogoButton icon={route.icon} />
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>

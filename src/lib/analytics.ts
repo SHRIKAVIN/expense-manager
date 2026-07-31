@@ -1,5 +1,11 @@
 import type { Category, Expense, IncomeEntry } from "./types";
-import { isoToDate, monthKey } from "./format";
+import {
+  currentMonthKey,
+  isoToDate,
+  isOverallPeriod,
+  monthKey,
+  shiftMonthKey,
+} from "./format";
 
 export function sum(expenses: Expense[]): number {
   return expenses.reduce((acc, e) => acc + e.amount, 0);
@@ -12,11 +18,13 @@ export function expensesForTotals(expenses: Expense[]): Expense[] {
 
 export function sumIncome(entries: IncomeEntry[], month?: string): number {
   return entries
-    .filter((e) => !month || e.month === month)
+    .filter((e) => !month || isOverallPeriod(month) || e.month === month)
     .reduce((acc, e) => acc + e.amount, 0);
 }
 
+/** Filter by `yyyy-mm`, or return all expenses when `key` is Overall. */
 export function filterByMonth(expenses: Expense[], key: string): Expense[] {
+  if (isOverallPeriod(key)) return expenses;
   return expenses.filter((e) => monthKey(e.date) === key);
 }
 
@@ -68,15 +76,18 @@ export function weeklyTrend(expenses: Expense[]): TrendPoint[] {
   });
 }
 
-/** Per-day totals for the current month. */
-export function monthlyTrend(expenses: Expense[]): TrendPoint[] {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const days = new Date(year, month + 1, 0).getDate();
+/** Per-day totals for a month (`yyyy-mm`). Defaults to the current month.
+ *  For Overall, returns per-month totals across the available range. */
+export function monthlyTrend(expenses: Expense[], month = currentMonthKey()): TrendPoint[] {
+  if (isOverallPeriod(month)) return yearlyTrend(expenses);
+
+  const [y, m] = month.split("-").map(Number);
+  const year = y;
+  const monthIndex = (m ?? 1) - 1;
+  const days = new Date(year, monthIndex + 1, 0).getDate();
   const points: TrendPoint[] = [];
   for (let d = 1; d <= days; d++) {
-    const iso = new Date(year, month, d).toISOString().slice(0, 10);
+    const iso = `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const total = expenses.filter((e) => e.date === iso).reduce((a, e) => a + e.amount, 0);
     points.push({ label: String(d), total });
   }
@@ -89,7 +100,7 @@ export function yearlyTrend(expenses: Expense[]): TrendPoint[] {
   const points: TrendPoint[] = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = d.toISOString().slice(0, 7);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const label = d.toLocaleDateString(undefined, { month: "short" });
     const total = expenses
       .filter((e) => monthKey(e.date) === key)
@@ -99,12 +110,14 @@ export function yearlyTrend(expenses: Expense[]): TrendPoint[] {
   return points;
 }
 
-/** Month-over-month comparison: this month vs previous month. */
-export function monthOverMonth(expenses: Expense[]): { current: number; previous: number } {
-  const now = new Date();
-  const cur = now.toISOString().slice(0, 7);
-  const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prev = prevDate.toISOString().slice(0, 7);
+/** Month-over-month comparison for a given month (`yyyy-mm`) vs the prior month.
+ *  Overall falls back to the current calendar month vs previous. */
+export function monthOverMonth(
+  expenses: Expense[],
+  month = currentMonthKey(),
+): { current: number; previous: number } {
+  const cur = isOverallPeriod(month) ? currentMonthKey() : month;
+  const prev = shiftMonthKey(cur, -1);
   return {
     current: sum(filterByMonth(expenses, cur)),
     previous: sum(filterByMonth(expenses, prev)),

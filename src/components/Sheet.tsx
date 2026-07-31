@@ -84,7 +84,7 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
                 <CloseIcon size={20} />
               </Button>
             </div>
-            <div className="overflow-y-auto overscroll-contain px-6 pb-6 flex-1 min-h-0 [&:last-child]:pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
+            <div className="overflow-y-auto overscroll-contain scroll-smooth px-6 pb-6 flex-1 min-h-0 [&:last-child]:pb-[calc(env(safe-area-inset-bottom)+1.5rem)]">
               {children}
             </div>
             {footer && (

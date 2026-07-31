@@ -284,10 +284,11 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
         });
         if (reimbErr) throwDb(reimbErr.message);
       } else if (existingReimb && existingReimb.status === "pending") {
-        await sb()
+        const { error: reimbUpdateErr } = await sb()
           .from("reimbursement_requests")
           .update({ amount: expense.amount, merchant: expense.merchant })
           .eq("id", existingReimb.id);
+        if (reimbUpdateErr) throwDb(reimbUpdateErr.message);
       }
 
       return expense;

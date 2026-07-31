@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/format";
 import type { Category, IncomeEntry } from "@/lib/types";
 import type { CategorySlice } from "@/lib/analytics";
 
-export type DashboardSummaryKind = "income" | "spent" | "budget";
+export type DashboardSummaryKind = "income" | "spent" | "remaining" | "budget";
 
 interface DashboardSummarySheetProps {
   kind: DashboardSummaryKind | null;
@@ -19,6 +19,8 @@ interface DashboardSummarySheetProps {
   spentTotal?: number;
   expenseCount?: number;
   slices?: CategorySlice[];
+  /** Remaining */
+  remainingTotal?: number;
   /** Budget */
   budgeted?: Category[];
   budgetSpentByCategory?: Record<string, number>;
@@ -35,6 +37,7 @@ export function DashboardSummarySheet({
   spentTotal = 0,
   expenseCount = 0,
   slices = [],
+  remainingTotal = 0,
   budgeted = [],
   budgetSpentByCategory = {},
   budgetTotals = { totalLimit: 0, totalSpentBudgeted: 0 },
@@ -46,9 +49,11 @@ export function DashboardSummarySheet({
       ? `Income · ${monthLabel}`
       : kind === "spent"
         ? `Spent · ${monthLabel}`
-        : kind === "budget"
-          ? `Budget health · ${monthLabel}`
-          : "";
+        : kind === "remaining"
+          ? `Remaining · ${monthLabel}`
+          : kind === "budget"
+            ? `Budget health · ${monthLabel}`
+            : "";
 
   return (
     <Sheet open={open} onClose={onClose} title={title}>
@@ -103,6 +108,42 @@ export function DashboardSummarySheet({
               ))}
             </ul>
           )}
+        </div>
+      )}
+
+      {kind === "remaining" && (
+        <div className="flex flex-col items-center text-center gap-4">
+          <p
+            className={`text-display-md tabular-nums text-center ${
+              remainingTotal >= 0 ? "text-emerald-600" : "text-red-600"
+            }`}
+          >
+            {formatCurrency(remainingTotal, currency)}
+          </p>
+          <ul className="flex flex-col gap-3 w-full">
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-body text-ink">Income</span>
+              <span className="text-body-strong text-primary tabular-nums shrink-0">
+                +{formatCurrency(incomeTotal, currency)}
+              </span>
+            </li>
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-body text-ink">Spent</span>
+              <span className="text-body-strong text-amber-700 tabular-nums shrink-0">
+                −{formatCurrency(spentTotal, currency)}
+              </span>
+            </li>
+            <li className="flex items-center justify-between gap-3 border-t border-ink/10 pt-3">
+              <span className="text-body-strong text-ink">Remaining</span>
+              <span
+                className={`text-body-strong tabular-nums shrink-0 ${
+                  remainingTotal >= 0 ? "text-emerald-600" : "text-red-600"
+                }`}
+              >
+                {formatCurrency(remainingTotal, currency)}
+              </span>
+            </li>
+          </ul>
         </div>
       )}
 

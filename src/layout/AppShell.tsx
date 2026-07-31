@@ -38,9 +38,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showFab = showExpenseFab || showIncomeFab;
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
+    scrollRef.current?.scrollTo({
+      top: 0,
+      behavior: reduced ? "auto" : "smooth",
+    });
     setScrolled(false);
-  }, [location.pathname]);
+  }, [location.pathname, reduced]);
 
   useEffect(() => {
     if (isQuickSwitchViewOnly && user?.email) {
@@ -81,7 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
       >
         {/* Left rail (desktop) */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto border-r border-hairline bg-canvas-parchment px-3 py-8 justify-between">
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 lg:h-full lg:overflow-y-auto lg:scroll-smooth border-r border-hairline bg-canvas-parchment px-3 py-8 justify-between">
           <div>
             <div className="px-3 mb-8 flex items-center gap-2">
               <HomeLogoButton icon={HomeIcon} />
@@ -130,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ref={scrollRef}
             onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 6)}
             className={cn(
-              "flex-1 min-h-0 overflow-y-auto overflow-x-hidden lg:pb-12",
+              "flex-1 min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth lg:pb-12",
               showFab
                 ? "pb-[calc(var(--fab-bottom-offset)+5.75rem)]"
                 : "pb-[var(--fab-bottom-offset)]",

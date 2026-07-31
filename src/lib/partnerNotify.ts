@@ -7,6 +7,7 @@ import type { Expense, ReimbursementRequest, SessionUser } from "@/lib/types";
 export type PartnerNotificationKind =
   | "expense_added"
   | "reimbursement_requested"
+  | "reimbursement_updated"
   | "reimbursement_marked_paid"
   | "reimbursement_confirmed"
   | "reimbursement_rejected"
@@ -91,6 +92,25 @@ export async function notifyPartnerExpenseAdded(
     title: `${name} added an expense`,
     body: `${amount} at ${expense.merchant}`,
     kind: "expense_added",
+  });
+}
+
+/** Notify payer when requester changes amount/merchant on a pending request. */
+export async function notifyPartnerReimbursementUpdated(
+  user: SessionUser,
+  req: ReimbursementRequest,
+) {
+  const partner = partnerFor(user);
+  if (!partner || req.requesterId !== user.id) return;
+  const name = actorName(user);
+  const amount = formatCurrency(req.amount, user.currency);
+
+  await sendPartnerNotification({
+    recipientEmail: partner.email,
+    actorName: name,
+    title: `${name} updated a reimbursement`,
+    body: `${amount} for ${req.merchant} — tap to review`,
+    kind: "reimbursement_updated",
   });
 }
 

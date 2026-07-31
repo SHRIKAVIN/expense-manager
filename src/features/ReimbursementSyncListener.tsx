@@ -1,52 +1,50 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useAppData } from "@/data/AppDataProvider";
 import { getSupabase, isSupabaseEnabled } from "@/lib/supabase/client";
 
-/** Keeps reimbursement state in sync when the partner updates requests in real time. */
+/**
+ * Live-sync reimbursements while the app is open.
+ * Relies on RLS (no email filters) so the payer always receives events for
+ * rows they can SELECT — inserts, amount updates, deletes, status changes.
+ */
 export function ReimbursementSyncListener() {
   const { user } = useAuth();
   const { refresh } = useAppData();
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
 
   useEffect(() => {
     if (!user || !isSupabaseEnabled()) return;
 
     const sb = getSupabase();
-    const userId = user.id;
-    const email = user.email.toLowerCase();
+    let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     const onChange = () => {
-      void refresh();
+      window.clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        void refreshRef.current();
+      }, 120);
     };
 
     const channel = sb
-      .channel(`reimbursement-sync-${userId}`)
+      .channel(`reimbursement-sync-${user.id}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "reimbursement_requests",
-          filter: `requester_id=eq.${userId}`,
-        },
-        onChange,
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "reimbursement_requests",
-          filter: `payer_email=eq.${email}`,
         },
         onChange,
       )
       .subscribe();
 
     return () => {
+      window.clearTimeout(debounceTimer);
       void sb.removeChannel(channel);
     };
-  }, [refresh, user]);
+  }, [user]);
 
   return null;
 }

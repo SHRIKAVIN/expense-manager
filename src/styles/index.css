@@ -32,6 +32,10 @@
     overscroll-behavior: none;
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   /* Installed iOS PWA: pin the app to the physical screen (dvh can under-report). */
   html.pwa-standalone,
   html.pwa-standalone body,
@@ -46,8 +50,8 @@
 
   body {
     margin: 0;
-    /* Hex fallback — iOS standalone can fail to parse CSS-var-only backgrounds,
-       leaving a visible strip below the nav in the home-indicator zone. */
+    padding-top: 0; /* safe area is handled on the sticky header, not body */
+    /* Hex fallback — iOS standalone can fail to parse CSS-var-only backgrounds. */
     background-color: #ffffff;
     background-color: var(--color-canvas);
     color: var(--color-ink);
@@ -60,21 +64,13 @@
     /* Mobile feel: kill tap flash + the 300ms delay, prevent rubber-band chaining. */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
-    overscroll-behavior-y: none;
+    overscroll-behavior: none;
     /* Theme cross-fade per §6 */
     transition: background-color 200ms ease, color 200ms ease;
   }
 
   [data-theme="dark"] body {
     background-color: #1d1d1f;
-  }
-
-  /* Honour the notch on the sides too (landscape / edge-to-edge). */
-  @supports (padding: max(0px)) {
-    body {
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-    }
   }
 
   /* Display sizes (>=19px) get extra negative tracking to counter Inter's wide default. */
@@ -315,42 +311,15 @@
   }
 }
 
-/* App header (mobile) + bottom safe-area for FAB / scroll padding. */
+/* App header (mobile). Top safe-area is applied on the sticky header only
+   (see AppHeader style). No viewport-fit=cover — bottom inset stays system-owned. */
 :root {
   --app-header-bar: 3.5rem;
-  --app-header-safe-top: env(safe-area-inset-top, 0px);
-  --app-header-extra-top: 0.375rem;
-  --app-header-total: calc(
-    var(--app-header-bar) + var(--app-header-safe-top) + var(--app-header-extra-top)
-  );
-  --fab-bottom-safe: env(safe-area-inset-bottom, 0px);
-  --fab-bottom-offset: calc(var(--fab-bottom-safe) + 1rem);
-}
-
-/* Installed iPhone PWA: remove bottom safe-area gap — full-screen layout. */
-html.pwa-standalone,
-html.ios.pwa-standalone {
-  --fab-bottom-safe: 0px;
-  --fab-bottom-offset: 0px;
-}
-
-@media (display-mode: standalone) {
-  :root {
-    --fab-bottom-safe: 0px;
-    --fab-bottom-offset: 0px;
-  }
-}
-
-html.pwa-standalone .auth-screen-inner,
-html.ios.pwa-standalone .auth-screen-inner {
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  --fab-bottom-offset: 1rem;
 }
 
 .app-header {
-  padding-top: calc(var(--app-header-safe-top) + var(--app-header-extra-top));
   padding-bottom: 0.25rem;
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
   /* Frosted bar — content scrolls beneath sticky header (same as ScreenHeader). */
   background-color: color-mix(in srgb, var(--color-canvas) 72%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -371,6 +340,7 @@ html.ios.pwa-standalone .auth-screen-inner {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior-y: contain;
+  scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
   background-color: var(--color-canvas);
 }

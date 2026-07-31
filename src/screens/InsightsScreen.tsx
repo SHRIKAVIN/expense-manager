@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -13,6 +13,7 @@ import { Screen, ScreenHeader } from "@/layout/Screen";
 import { Card } from "@/components/Card";
 import { ChartFrame } from "@/components/ChartFrame";
 import { EmptyState } from "@/components/EmptyState";
+import { MonthPicker } from "@/components/MonthPicker";
 import { SegmentedControl, type Segment } from "@/components/SegmentedControl";
 import { useAppData } from "@/data/AppDataProvider";
 import { useAuth } from "@/auth/AuthProvider";
@@ -25,7 +26,7 @@ import {
   filterByMonth,
   sum,
 } from "@/lib/analytics";
-import { currentMonthKey, formatCurrency } from "@/lib/format";
+import { currentMonthKey, formatCurrency, isOverallPeriod, monthLabel, shiftMonthKey } from "@/lib/format";
 import { ChartIcon } from "@/lib/icons";
 
 type Range = "week" | "month" | "year";
@@ -41,24 +42,50 @@ export function InsightsScreen() {
   const currency = user?.currency ?? "INR";
   const { expenses, expensesForTotals, categoriesById } = useAppData();
   const [range, setRange] = useState<Range>("month");
+  const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
+
+  const minMonth = useMemo(() => {
+    if (expenses.length === 0) return undefined;
+    return expenses.reduce(
+      (min, e) => (e.date.slice(0, 7) < min ? e.date.slice(0, 7) : min),
+      currentMonthKey(),
+    );
+  }, [expenses]);
+
+  useEffect(() => {
+    if (!minMonth) return;
+    if (isOverallPeriod(selectedMonth)) return;
+    if (selectedMonth < minMonth) setSelectedMonth(minMonth);
+  }, [minMonth, selectedMonth]);
 
   const trend = useMemo(() => {
     if (range === "week") return weeklyTrend(expensesForTotals);
-    if (range === "year") return yearlyTrend(expensesForTotals);
-    return monthlyTrend(expensesForTotals);
-  }, [expensesForTotals, range]);
+    if (range === "year" || isOverallPeriod(selectedMonth)) {
+      return yearlyTrend(expensesForTotals);
+    }
+    return monthlyTrend(expensesForTotals, selectedMonth);
+  }, [expensesForTotals, range, selectedMonth]);
 
   const monthExpenses = useMemo(
-    () => filterByMonth(expensesForTotals, currentMonthKey()),
-    [expensesForTotals],
+    () => filterByMonth(expensesForTotals, selectedMonth),
+    [expensesForTotals, selectedMonth],
   );
   const categoryBars = useMemo(
     () => spendByCategory(monthExpenses, categoriesById),
     [monthExpenses, categoriesById],
   );
-  const mom = useMemo(() => monthOverMonth(expensesForTotals), [expensesForTotals]);
+  const mom = useMemo(
+    () => monthOverMonth(expensesForTotals, selectedMonth),
+    [expensesForTotals, selectedMonth],
+  );
   const momDelta = mom.current - mom.previous;
   const momPct = mom.previous > 0 ? (momDelta / mom.previous) * 100 : 0;
+  const momCurrentKey = isOverallPeriod(selectedMonth)
+    ? currentMonthKey()
+    : selectedMonth;
+  const previousMonthLabel = monthLabel(shiftMonthKey(momCurrentKey, -1));
+  const currentPeriodLabel = monthLabel(momCurrentKey);
+  const selectedPeriodLabel = monthLabel(selectedMonth);
 
   const tooltipFormatter = (value: unknown) => formatCurrency(Number(value), currency);
 
@@ -78,8 +105,17 @@ export function InsightsScreen() {
   }
 
   return (
-    <Screen topInset={false}>
+    <Screen topInset={false} data-testid="insights-screen">
       <ScreenHeader title="Insights" />
+
+      <div className="mb-4" data-testid="insights-month-picker">
+        <MonthPicker
+          value={selectedMonth}
+          onChange={setSelectedMonth}
+          minMonth={minMonth}
+          data-testid="insights-month-select"
+        />
+      </div>
 
       <div className="flex flex-col gap-4">
         <Card>
@@ -143,15 +179,15 @@ export function InsightsScreen() {
         <Card>
           <p className="text-tagline text-ink mb-1">Month over month</p>
           <p className="text-body text-ink-muted-48 mb-4">
-            {momDelta >= 0 ? "Up" : "Down"} {Math.abs(momPct).toFixed(0)}% vs last month
+            {momDelta >= 0 ? "Up" : "Down"} {Math.abs(momPct).toFixed(0)}% vs {previousMonthLabel}
           </p>
           <div className="flex items-end gap-8">
             <div>
-              <p className="text-caption text-ink-muted-48">This month</p>
+              <p className="text-caption text-ink-muted-48">{currentPeriodLabel}</p>
               <p className="text-tagline text-ink">{formatCurrency(mom.current, currency)}</p>
             </div>
             <div>
-              <p className="text-caption text-ink-muted-48">Last month</p>
+              <p className="text-caption text-ink-muted-48">{previousMonthLabel}</p>
               <p className="text-tagline text-ink-muted-80">
                 {formatCurrency(mom.previous, currency)}
               </p>
@@ -160,9 +196,15 @@ export function InsightsScreen() {
         </Card>
 
         <Card>
-          <p className="text-tagline text-ink mb-5">Spend by category · this month</p>
+          <p className="text-tagline text-ink mb-5">
+            Spend by category · {selectedPeriodLabel}
+          </p>
           {categoryBars.length === 0 ? (
-            <p className="text-body text-ink-muted-48">No spending this month yet.</p>
+            <p className="text-body text-ink-muted-48">
+              {isOverallPeriod(selectedMonth)
+                ? "No spending recorded yet."
+                : "No spending this month yet."}
+            </p>
           ) : (
             <ChartFrame className="h-64 -ml-2">
               {(width, height) => (
@@ -216,7 +258,7 @@ export function InsightsScreen() {
 
         <Card>
           <div className="flex items-center justify-between">
-            <p className="text-body text-ink-muted-80">Total this month</p>
+            <p className="text-body text-ink-muted-80">Total · {selectedPeriodLabel}</p>
             <p className="text-body-strong text-ink">{formatCurrency(sum(monthExpenses), currency)}</p>
           </div>
         </Card>

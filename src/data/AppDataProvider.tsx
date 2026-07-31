@@ -21,6 +21,7 @@ import {
   notifyPartnerReimbursementConfirmed,
   notifyPartnerReimbursementMarkedPaid,
   notifyPartnerReimbursementRejected,
+  notifyPartnerReimbursementUpdated,
 } from "@/lib/partnerNotify";
 import type {
   Category,
@@ -175,14 +176,32 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   );
   const editExpense = useCallback(
     async (id: string, patch: Partial<ExpenseInput>) => {
-      const hadReimb = Boolean(reimbursements.find((r) => r.expenseId === id && r.status !== "completed"));
+      const existingReimb = reimbursements.find(
+        (r) => r.expenseId === id && r.status !== "completed",
+      );
+      const hadReimb = Boolean(existingReimb);
       await repo.updateExpense(id, patch);
       await refresh();
-      if (user && patch.requestReimbursement && !hadReimb) {
+      if (!user) return;
+
+      if (patch.requestReimbursement && !hadReimb) {
         const updated = (await repo.listExpenses({})).find((e) => e.id === id);
         if (updated) {
           void notifyPartnerExpenseAdded(user, updated, true);
         }
+        return;
+      }
+
+      if (
+        existingReimb?.status === "pending" &&
+        !patch.clearReimbursement &&
+        (patch.amount !== undefined || patch.merchant !== undefined)
+      ) {
+        void notifyPartnerReimbursementUpdated(user, {
+          ...existingReimb,
+          amount: patch.amount ?? existingReimb.amount,
+          merchant: patch.merchant ?? existingReimb.merchant,
+        });
       }
     },
     [repo, refresh, reimbursements, user],
