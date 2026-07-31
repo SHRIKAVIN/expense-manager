@@ -51,7 +51,7 @@ export function Fab({
       data-testid={testId}
       whileTap={reduced ? undefined : pressProps.whileTap}
       transition={pressProps.transition}
-      className="absolute z-40 right-4 bottom-[var(--fab-bottom-offset)] lg:bottom-8 lg:right-8 flex h-20 w-20 items-center justify-center rounded-full outline-none"
+      className="absolute z-40 right-4 bottom-24 lg:bottom-8 lg:right-8 flex h-20 w-20 items-center justify-center rounded-full outline-none"
     >
       <FabAddLottie size={80} />
     </motion.button>
