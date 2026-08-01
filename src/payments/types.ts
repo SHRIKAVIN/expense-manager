@@ -15,7 +15,6 @@ export interface CreatePaymentInput {
     | "paytm"
     | "bhim"
     | "whatsapp"
-    | "amazonpay"
     | "supermoney"
     | "generic";
 }

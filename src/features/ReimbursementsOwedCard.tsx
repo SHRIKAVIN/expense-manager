@@ -177,33 +177,9 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     }
   };
 
-  const handlePaymentFailed = async () => {
-    if (!pendingReturn || !user || !partnerPay) {
-      dismissReturn();
-      return;
-    }
-    const { reimbursementIds: ids, intent } = pendingReturn;
-    const toRecord = reimbursementsToPay.filter((r) => ids.includes(r.id));
+  const handlePaymentFailed = () => {
     dismissReturn();
     setBusyId(null);
-    try {
-      for (const req of toRecord) {
-        await createSettlement({
-          reimbursementRequestId: req.id,
-          payerId: user.id,
-          payeeId: partnerPay.id,
-          payerName: user.displayName || user.email,
-          payeeName: partnerPay.displayName || req.requesterName,
-          merchant: req.merchant,
-          amount: req.amount,
-          method: "upi",
-          note: intent.note ?? `Settle ${req.merchant}`,
-          status: "cancelled",
-        });
-      }
-    } catch {
-      /* history write is best-effort */
-    }
     show("Marked as failed — still unpaid. Try Pay again when ready.");
   };
 

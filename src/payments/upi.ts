@@ -24,7 +24,7 @@ const ANDROID_UPI_PACKAGES: Partial<
   paytm: "net.one97.paytm",
   bhim: "in.org.npci.upiapp",
   whatsapp: "com.whatsapp",
-  amazonpay: "in.amazon.mShop.android.shopping",
+  // Play Store: https://play.google.com/store/apps/details?id=money.super.payments
   supermoney: "money.super.payments",
 };
 
@@ -57,7 +57,10 @@ function androidIntentUpi(query: string, pkg?: string): string {
 }
 
 /**
- * Build a launch URI for a preferred UPI app (best-effort deep link / Android package).
+ * Build a launch URI for a preferred UPI app.
+ *
+ * Note: https://pay.super.money does not resolve (no DNS). super.money is opened
+ * via Android package intent (money.super.payments) or generic upi:// elsewhere.
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildUpiQuery(input);
@@ -79,9 +82,8 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
     case "bhim":
       return `bhim://upi/pay?${query}`;
     case "whatsapp":
-    case "amazonpay":
     case "supermoney":
-      // No reliable iOS custom scheme — fall back to generic UPI.
+      // No public HTTPS pay host / iOS scheme from super.money — use generic UPI.
       return `upi://pay?${query}`;
     case "generic":
     default:

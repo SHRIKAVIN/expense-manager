@@ -11,8 +11,7 @@ export type UpiAppOption = {
 };
 
 /**
- * In-app picker order: GPay → PhonePe → super.money → BHIM → WhatsApp → Amazon.
- * Logos are the assets provided by the product owner.
+ * In-app picker order: GPay → PhonePe → super.money → Paytm → BHIM → WhatsApp → Other.
  */
 export const UPI_APP_OPTIONS: UpiAppOption[] = [
   {
@@ -34,6 +33,12 @@ export const UPI_APP_OPTIONS: UpiAppOption[] = [
     logo: "/upi-logos/supermoney.png",
   },
   {
+    id: "paytm",
+    label: "Paytm",
+    shortLabel: "Paytm",
+    logo: "/upi-logos/paytm.png",
+  },
+  {
     id: "bhim",
     label: "BHIM",
     shortLabel: "BHIM",
@@ -44,12 +49,6 @@ export const UPI_APP_OPTIONS: UpiAppOption[] = [
     label: "WhatsApp Pay",
     shortLabel: "WhatsApp",
     logo: "/upi-logos/whatsapp.png",
-  },
-  {
-    id: "amazonpay",
-    label: "Amazon Pay",
-    shortLabel: "Amazon",
-    logo: "/upi-logos/amazonpay.png",
   },
   {
     id: "generic",
