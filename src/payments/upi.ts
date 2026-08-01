@@ -1,20 +1,25 @@
 import type { CreatePaymentInput, PaymentIntent, PaymentProvider } from "./types";
 import { buildCheckoutUpiQuery } from "./upiCheckoutLinks";
-import { assertPayeeVpa } from "./upiVpa";
+import {
+  assertPayeeVpa,
+  isValidUpiId as isValidUpiVpa,
+  toNpciVpa,
+} from "./upiVpa";
 
 export type UpiApp = NonNullable<CreatePaymentInput["preferredApp"]>;
 
+export { assertPayeeVpa };
+
+/** True for a complete VPA like name@oksbi (empty string is not valid). */
 export function isValidUpiId(upi: string): boolean {
-  try {
-    assertPayeeVpa(upi);
-    return true;
-  } catch {
-    return false;
-  }
+  return isValidUpiVpa(upi);
 }
 
+/** Soft normalize for forms — never throws (empty input stays empty). */
 export function normalizeUpiId(upi: string): string {
-  return assertPayeeVpa(upi);
+  const trimmed = upi.trim();
+  if (!trimmed) return "";
+  return toNpciVpa(trimmed);
 }
 
 function isAndroid(): boolean {
@@ -107,7 +112,7 @@ export function createUpiIntent(input: CreatePaymentInput): PaymentIntent {
     amount: input.amount,
     currency: (input.currency ?? "INR").toUpperCase(),
     payeeName: input.payeeName.trim() || "Payee",
-    payeeUpi: normalizeUpiId(input.payeeUpi),
+    payeeUpi: assertPayeeVpa(input.payeeUpi),
     note: input.note?.trim(),
   };
 }
