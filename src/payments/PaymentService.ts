@@ -1,8 +1,12 @@
 import type { CreatePaymentInput, PaymentIntent, PaymentProvider, PaymentProviderId } from "./types";
 import { upiPaymentProvider } from "./upi";
 
-const providers: Record<PaymentProviderId, PaymentProvider> = {
+const providers: Record<PaymentProviderId, PaymentProvider | undefined> = {
   upi: upiPaymentProvider,
+  razorpay: undefined,
+  cashfree: undefined,
+  stripe: undefined,
+  juspay: undefined,
 };
 
 /** Facade over payment providers — reimbursement UI depends only on this. */

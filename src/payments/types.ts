@@ -1,6 +1,6 @@
-/** Payment types — direct UPI deep links only (no third-party gateways). */
+/** Provider-agnostic payment types (UPI now; Razorpay/etc. later). */
 
-export type PaymentProviderId = "upi";
+export type PaymentProviderId = "upi" | "razorpay" | "cashfree" | "stripe" | "juspay";
 
 export interface CreatePaymentInput {
   payeeUpi: string;
@@ -11,7 +11,7 @@ export interface CreatePaymentInput {
   /** UPI `tr` — auto-generated when omitted. */
   transactionId?: string;
   /** Soft hint — browsers cannot reliably force a specific UPI app. */
-  preferredApp?: "whatsapp";
+  preferredApp?: "gpay" | "phonepe" | "paytm" | "whatsapp" | "generic";
 }
 
 export interface PaymentIntent {

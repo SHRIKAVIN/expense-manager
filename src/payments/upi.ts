@@ -1,32 +1,31 @@
 import type { CreatePaymentInput, PaymentIntent, PaymentProvider } from "./types";
-import { buildCheckoutUpiQuery } from "./upiCheckoutLinks";
-import {
-  assertPayeeVpa,
-  isValidUpiId as isValidUpiVpa,
-  toNpciVpa,
-} from "./upiVpa";
+
+/** Basic UPI VPA: local@handle (letters, digits, ., _, -). */
+const UPI_VPA_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
 
 export type UpiApp = NonNullable<CreatePaymentInput["preferredApp"]>;
 
-export { assertPayeeVpa };
-
-/** True for a complete VPA like name@oksbi (empty string is not valid). */
 export function isValidUpiId(upi: string): boolean {
-  return isValidUpiVpa(upi);
+  return UPI_VPA_RE.test(upi.trim());
 }
 
-/** Soft normalize for forms — never throws (empty input stays empty). */
 export function normalizeUpiId(upi: string): string {
-  const trimmed = upi.trim();
-  if (!trimmed) return "";
-  return toNpciVpa(trimmed);
+  return upi.trim().toLowerCase();
 }
 
 function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-/** Stable-enough txn ref for our ledger (not sent in WhatsApp deep links). */
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** Stable-enough txn ref for UPI `tr` (max ~35 chars commonly accepted). */
 export function createUpiTxnId(): string {
   const rand =
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -35,31 +34,52 @@ export function createUpiTxnId(): string {
   return `EM${Date.now().toString(36)}${rand}`.slice(0, 35);
 }
 
-function androidIntentPay(query: string, pkg: string): string {
-  return (
-    `intent://pay?${query}` +
-    `#Intent;scheme=upi;action=android.intent.action.VIEW;` +
-    `category=android.intent.category.BROWSABLE;package=${pkg};end`
-  );
+function buildUpiQuery(input: CreatePaymentInput): string {
+  const pa = normalizeUpiId(input.payeeUpi);
+  if (!isValidUpiId(pa)) {
+    throw new Error("Invalid UPI ID. Use a format like name@oksbi.");
+  }
+  if (!(input.amount > 0)) {
+    throw new Error("Amount must be greater than 0.");
+  }
+  const params = new URLSearchParams({
+    pa,
+    pn: input.payeeName.trim() || "Payee",
+    tr: (input.transactionId?.trim() || createUpiTxnId()).slice(0, 35),
+    am: input.amount.toFixed(2),
+    cu: (input.currency ?? "INR").toUpperCase(),
+  });
+  const note = input.note?.trim();
+  if (note) params.set("tn", note.slice(0, 80));
+  return params.toString();
 }
 
 /**
- * WhatsApp Pay deep link — no description (`tn`).
+ * App-specific UPI deep links for PWA / website.
+ * - GPay Android: tez://upi/pay
+ * - GPay iOS: gpay://upi/pay
+ * - PhonePe: phonepe://pay
+ * - Paytm: paytmmp://pay
+ * - WhatsApp / Other: upi://pay
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
-  const query = buildCheckoutUpiQuery({
-    payeeVpa: input.payeeUpi,
-    payeeName: input.payeeName,
-    amount: input.amount,
-    currency: input.currency,
-    transactionId: input.transactionId?.trim() || createUpiTxnId(),
-  });
+  const query = buildUpiQuery(input);
+  const app = input.preferredApp ?? "generic";
 
-  if (isAndroid()) {
-    return androidIntentPay(query, "com.whatsapp");
+  switch (app) {
+    case "gpay":
+      if (isIOS()) return `gpay://upi/pay?${query}`;
+      if (isAndroid()) return `tez://upi/pay?${query}`;
+      return `upi://pay?${query}`;
+    case "phonepe":
+      return `phonepe://pay?${query}`;
+    case "paytm":
+      return `paytmmp://pay?${query}`;
+    case "whatsapp":
+    case "generic":
+    default:
+      return `upi://pay?${query}`;
   }
-
-  return `upi://pay?${query}`;
 }
 
 /**
@@ -70,7 +90,7 @@ export function launchUpiUri(uri: string): void {
   window.location.href = uri;
 }
 
-/** Build + open a WhatsApp Pay deep link (sync — keep inside the tap). */
+/** Build + open a UPI deep link for the chosen app (sync — keep inside the tap). */
 export function openUpi(
   app: UpiApp,
   input: Omit<CreatePaymentInput, "preferredApp">,
@@ -88,7 +108,7 @@ export function createUpiIntent(input: CreatePaymentInput): PaymentIntent {
     amount: input.amount,
     currency: (input.currency ?? "INR").toUpperCase(),
     payeeName: input.payeeName.trim() || "Payee",
-    payeeUpi: assertPayeeVpa(input.payeeUpi),
+    payeeUpi: normalizeUpiId(input.payeeUpi),
     note: input.note?.trim(),
   };
 }
