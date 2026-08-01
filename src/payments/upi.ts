@@ -11,7 +11,12 @@ export function normalizeUpiId(upi: string): string {
   return upi.trim().toLowerCase();
 }
 
-export function buildUpiPayUri(input: CreatePaymentInput): string {
+function isAndroid(): boolean {
+  return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+}
+
+/** Query string shared by upi:// and Android intent:// forms. */
+function buildUpiQuery(input: CreatePaymentInput): { pa: string; query: string } {
   const pa = normalizeUpiId(input.payeeUpi);
   if (!isValidUpiId(pa)) {
     throw new Error("Invalid UPI ID. Use a format like name@oksbi.");
@@ -27,9 +32,16 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
   });
   const note = input.note?.trim();
   if (note) params.set("tn", note.slice(0, 80));
+  return { pa, query: params.toString() };
+}
 
-  const query = params.toString();
-  // Preferred-app schemes are best-effort; generic / missing → OS UPI chooser.
+/**
+ * Build a launch URI. For generic on Android, use Chrome's intent:// form so the
+ * system can show every installed app that handles UPI (GPay, PhonePe, etc.).
+ */
+export function buildUpiPayUri(input: CreatePaymentInput): string {
+  const { query } = buildUpiQuery(input);
+
   switch (input.preferredApp) {
     case "gpay":
       return `tez://upi/pay?${query}`;
@@ -41,37 +53,46 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
       return `bhim://upi/pay?${query}`;
     case "generic":
     default:
+      if (isAndroid()) {
+        // No package= → Android resolves all UPI handlers and shows the native chooser
+        // (or the default app if the user set one).
+        return (
+          `intent://pay?${query}` +
+          "#Intent;scheme=upi;action=android.intent.action.VIEW;" +
+          "category=android.intent.category.BROWSABLE;end"
+        );
+      }
       return `upi://pay?${query}`;
   }
 }
 
-export async function launchUpiUri(uri: string): Promise<void> {
-  // Top-level handoff so Android can show the native UPI app chooser
-  // (only apps installed on the device that handle upi://).
-  const anchor = document.createElement("a");
-  anchor.href = uri;
-  anchor.rel = "noopener";
-  anchor.style.display = "none";
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
+/**
+ * Must run in the same user-gesture turn as the tap (no await before this),
+ * or mobile browsers may refuse to open the native UPI chooser.
+ */
+export function launchUpiUri(uri: string): void {
+  window.location.href = uri;
+}
+
+export function createUpiIntent(input: CreatePaymentInput): PaymentIntent {
+  const uri = buildUpiPayUri(input);
+  return {
+    providerId: "upi",
+    uri,
+    amount: input.amount,
+    currency: (input.currency ?? "INR").toUpperCase(),
+    payeeName: input.payeeName.trim() || "Payee",
+    payeeUpi: normalizeUpiId(input.payeeUpi),
+    note: input.note?.trim(),
+  };
 }
 
 export const upiPaymentProvider: PaymentProvider = {
   id: "upi",
   async createIntent(input) {
-    const uri = buildUpiPayUri(input);
-    return {
-      providerId: "upi",
-      uri,
-      amount: input.amount,
-      currency: (input.currency ?? "INR").toUpperCase(),
-      payeeName: input.payeeName.trim() || "Payee",
-      payeeUpi: normalizeUpiId(input.payeeUpi),
-      note: input.note?.trim(),
-    } satisfies PaymentIntent;
+    return createUpiIntent(input);
   },
   async launch(intent) {
-    await launchUpiUri(intent.uri);
+    launchUpiUri(intent.uri);
   },
 };

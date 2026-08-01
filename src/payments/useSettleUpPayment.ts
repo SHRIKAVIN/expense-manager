@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { PaymentService } from "./PaymentService";
+import { createUpiIntent, launchUpiUri } from "./upi";
 import type { CreatePaymentInput, PaymentIntent } from "./types";
 
 export type PendingSettleReturn = {
@@ -8,9 +8,9 @@ export type PendingSettleReturn = {
 };
 
 /**
- * Launches a UPI payment and, when the user returns to the PWA, exposes
- * pending settle metadata. Does not ask “did it complete?” — callers settle
- * on return. Still cannot verify the bank txn from a deep link alone.
+ * Launches UPI in the same tick as the user tap so Android can show the native
+ * installed-apps chooser. When the user returns, exposes pending settle metadata
+ * so the UI can ask success vs failed (UPI deep links never report status).
  */
 export function useSettleUpPayment() {
   const [pendingReturn, setPendingReturn] = useState<PendingSettleReturn | null>(null);
@@ -38,14 +38,16 @@ export function useSettleUpPayment() {
   }, [onReturn]);
 
   const payNow = useCallback(
-    async (reimbursementIds: string[], input: CreatePaymentInput) => {
+    (reimbursementIds: string[], input: CreatePaymentInput): PaymentIntent => {
       if (reimbursementIds.length === 0) {
         throw new Error("Nothing to pay.");
       }
-      const intent = await PaymentService.createAndLaunch(input);
+      // Sync create + launch — must stay inside the click gesture.
+      const intent = createUpiIntent(input);
       metaRef.current = { reimbursementIds, intent };
       launchedRef.current = true;
-      // Fallback: some browsers never fire visibility after upi:// — settle after delay.
+      launchUpiUri(intent.uri);
+      // Fallback if visibility never fires after the handoff.
       window.setTimeout(() => {
         if (launchedRef.current) onReturn();
       }, 2500);
