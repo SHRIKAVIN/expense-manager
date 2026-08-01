@@ -3,6 +3,8 @@ import type { CreatePaymentInput, PaymentIntent, PaymentProvider } from "./types
 /** Basic UPI VPA: local@handle (letters, digits, ., _, -). */
 const UPI_VPA_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
 
+export type UpiApp = NonNullable<CreatePaymentInput["preferredApp"]>;
+
 export function isValidUpiId(upi: string): boolean {
   return UPI_VPA_RE.test(upi.trim());
 }
@@ -15,14 +17,22 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-/** Android package names so we open a specific app instead of the default chooser. */
-const ANDROID_UPI_PACKAGES: Partial<
-  Record<NonNullable<CreatePaymentInput["preferredApp"]>, string>
-> = {
-  gpay: "com.google.android.apps.nbu.paisa.user",
-  phonepe: "com.phonepe.app",
-  whatsapp: "com.whatsapp",
-};
+function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
+}
+
+/** Stable-enough txn ref for UPI `tr` (max ~35 chars commonly accepted). */
+export function createUpiTxnId(): string {
+  const rand =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replace(/-/g, "").slice(0, 12)
+      : Math.random().toString(36).slice(2, 14);
+  return `EM${Date.now().toString(36)}${rand}`.slice(0, 35);
+}
 
 function buildUpiQuery(input: CreatePaymentInput): string {
   const pa = normalizeUpiId(input.payeeUpi);
@@ -35,6 +45,7 @@ function buildUpiQuery(input: CreatePaymentInput): string {
   const params = new URLSearchParams({
     pa,
     pn: input.payeeName.trim() || "Payee",
+    tr: (input.transactionId?.trim() || createUpiTxnId()).slice(0, 35),
     am: input.amount.toFixed(2),
     cu: (input.currency ?? "INR").toUpperCase(),
   });
@@ -43,36 +54,30 @@ function buildUpiQuery(input: CreatePaymentInput): string {
   return params.toString();
 }
 
-function androidIntentUpi(query: string, pkg?: string): string {
-  const packagePart = pkg ? `package=${pkg};` : "";
-  return (
-    `intent://pay?${query}` +
-    `#Intent;scheme=upi;action=android.intent.action.VIEW;` +
-    `category=android.intent.category.BROWSABLE;${packagePart}end`
-  );
-}
-
-/** Build a launch URI for a preferred UPI app. */
+/**
+ * App-specific UPI deep links for PWA / website.
+ * - GPay Android: tez://upi/pay
+ * - GPay iOS: gpay://upi/pay
+ * - PhonePe: phonepe://pay
+ * - Paytm: paytmmp://pay
+ * - WhatsApp / Other: upi://pay
+ */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildUpiQuery(input);
   const app = input.preferredApp ?? "generic";
-  const android = isAndroid();
-
-  if (android && app !== "generic") {
-    const pkg = ANDROID_UPI_PACKAGES[app];
-    if (pkg) return androidIntentUpi(query, pkg);
-  }
 
   switch (app) {
     case "gpay":
-      return `tez://upi/pay?${query}`;
+      if (isIOS()) return `gpay://upi/pay?${query}`;
+      if (isAndroid()) return `tez://upi/pay?${query}`;
+      return `upi://pay?${query}`;
     case "phonepe":
       return `phonepe://pay?${query}`;
+    case "paytm":
+      return `paytmmp://pay?${query}`;
     case "whatsapp":
-      return `upi://pay?${query}`;
     case "generic":
     default:
-      if (android) return androidIntentUpi(query);
       return `upi://pay?${query}`;
   }
 }
@@ -83,6 +88,16 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
  */
 export function launchUpiUri(uri: string): void {
   window.location.href = uri;
+}
+
+/** Build + open a UPI deep link for the chosen app (sync — keep inside the tap). */
+export function openUpi(
+  app: UpiApp,
+  input: Omit<CreatePaymentInput, "preferredApp">,
+): PaymentIntent {
+  const intent = createUpiIntent({ ...input, preferredApp: app });
+  launchUpiUri(intent.uri);
+  return intent;
 }
 
 export function createUpiIntent(input: CreatePaymentInput): PaymentIntent {
