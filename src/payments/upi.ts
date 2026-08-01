@@ -29,7 +29,7 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
   if (note) params.set("tn", note.slice(0, 80));
 
   const query = params.toString();
-  // Preferred-app schemes are best-effort; generic upi:// is the reliable path.
+  // Preferred-app schemes are best-effort; generic / missing → OS UPI chooser.
   switch (input.preferredApp) {
     case "gpay":
       return `tez://upi/pay?${query}`;
@@ -39,13 +39,15 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
       return `paytmmp://pay?${query}`;
     case "bhim":
       return `bhim://upi/pay?${query}`;
+    case "generic":
     default:
       return `upi://pay?${query}`;
   }
 }
 
 export async function launchUpiUri(uri: string): Promise<void> {
-  // PWA-safe: navigate so the OS can hand off to a UPI app / chooser.
+  // Top-level handoff so Android can show the native UPI app chooser
+  // (only apps installed on the device that handle upi://).
   const anchor = document.createElement("a");
   anchor.href = uri;
   anchor.rel = "noopener";

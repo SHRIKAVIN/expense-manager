@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { Sheet } from "@/components/Sheet";
@@ -15,20 +15,45 @@ import {
   type PartnerPaymentInfo,
 } from "@/payments/settlementsApi";
 import { useSettleUpPayment } from "@/payments/useSettleUpPayment";
+import type { CreatePaymentInput } from "@/payments/types";
 import type { ReimbursementRequest } from "@/lib/types";
+
+type PayTarget =
+  | { mode: "single"; req: ReimbursementRequest }
+  | { mode: "all"; requests: ReimbursementRequest[] };
+
+type PreferredApp = NonNullable<CreatePaymentInput["preferredApp"]>;
+
+/** Compact shortcuts if the OS chooser fails (common on some iOS browsers). */
+const APP_SHORTCUTS: { id: PreferredApp; label: string }[] = [
+  { id: "gpay", label: "GPay" },
+  { id: "phonepe", label: "PhonePe" },
+  { id: "paytm", label: "Paytm" },
+  { id: "bhim", label: "BHIM" },
+];
+
+function tapHaptic() {
+  try {
+    navigator.vibrate?.(12);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   const { user } = useAuth();
   const { reimbursementsToPay, markReimbursementPaid, can } = useAppData();
   const { show } = useToast();
-  const { pendingConfirm, payNow, dismissConfirm } = useSettleUpPayment();
+  const { pendingReturn, payNow, dismissReturn } = useSettleUpPayment();
   const [partnerPay, setPartnerPay] = useState<PartnerPaymentInfo | null>(null);
   const [partnerLoading, setPartnerLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
   const [celebration, setCelebration] = useState<{
     amountLabel: string;
     detail: string;
   } | null>(null);
+  const settlingRef = useRef(false);
 
   const partnerEmail = user?.email ? getReimbursementPartner(user.email)?.email : undefined;
 
@@ -51,7 +76,66 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     };
   }, [partnerEmail, reimbursementsToPay.length]);
 
-  if (reimbursementsToPay.length === 0 && !celebration && !pendingConfirm) return null;
+  // On return from UPI, mark paid without asking the payer again.
+  useEffect(() => {
+    if (!pendingReturn || !user || !partnerPay || settlingRef.current) return;
+    const { reimbursementIds: ids, intent } = pendingReturn;
+    const toSettle = reimbursementsToPay.filter((r) => ids.includes(r.id));
+    dismissReturn();
+    if (toSettle.length === 0) {
+      show("Those reimbursements are no longer pending");
+      return;
+    }
+    settlingRef.current = true;
+    setBusyId(ids.length > 1 ? "all" : ids[0]!);
+
+    void (async () => {
+      try {
+        for (const req of toSettle) {
+          await createSettlement({
+            reimbursementRequestId: req.id,
+            payerId: user.id,
+            payeeId: partnerPay.id,
+            payerName: user.displayName || user.email,
+            payeeName: partnerPay.displayName || req.requesterName,
+            merchant: req.merchant,
+            amount: req.amount,
+            method: "upi",
+            note: intent.note ?? `Settle ${req.merchant}`,
+            status: "payer_confirmed",
+          });
+          await markReimbursementPaid(req.id);
+        }
+        const total = toSettle.reduce((s, r) => s + r.amount, 0);
+        const name = toSettle[0]?.requesterName ?? "partner";
+        setCelebration({
+          amountLabel: formatCurrency(total, currency),
+          detail:
+            toSettle.length > 1
+              ? `Marked ${toSettle.length} refunds paid — waiting for ${name} to confirm`
+              : `Waiting for ${name} to confirm they received it`,
+        });
+      } catch (err) {
+        show(err instanceof Error ? err.message : "Could not record settlement");
+      } finally {
+        settlingRef.current = false;
+        setBusyId(null);
+      }
+    })();
+  }, [
+    pendingReturn,
+    user,
+    partnerPay,
+    reimbursementsToPay,
+    dismissReturn,
+    markReimbursementPaid,
+    show,
+    currency,
+  ]);
+
+  if (reimbursementsToPay.length === 0 && !celebration && !pendingReturn && !payTarget) {
+    return null;
+  }
 
   const handleMarkPaid = async (id: string, name: string, amount: number) => {
     try {
@@ -68,8 +152,7 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     }
   };
 
-  const handlePayNow = async (req: ReimbursementRequest) => {
-    if (!user) return;
+  const openPaySheet = (target: PayTarget) => {
     if (isOffline()) {
       show("You're offline — use Mark paid without UPI when online, or wait for a connection");
       return;
@@ -78,53 +161,36 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
       show("Ask them to add their UPI ID in Settings");
       return;
     }
-    try {
-      setBusyId(req.id);
-      await payNow(req.id, {
-        payeeUpi: partnerPay.upiId,
-        payeeName: partnerPay.displayName || req.requesterName,
-        amount: req.amount,
-        currency,
-        note: `Settle ${req.merchant}`,
-      });
-    } catch (err) {
-      show(err instanceof Error ? err.message : "Could not open UPI");
-    } finally {
-      setBusyId(null);
-    }
+    tapHaptic();
+    setPayTarget(target);
   };
 
-  const handleConfirmPaid = async () => {
-    if (!pendingConfirm || !user || !partnerPay) return;
-    const req = reimbursementsToPay.find((r) => r.id === pendingConfirm.reimbursementId);
-    if (!req) {
-      dismissConfirm();
-      show("That reimbursement is no longer pending");
-      return;
-    }
+  const launchPay = async (preferredApp: PreferredApp = "generic") => {
+    if (!user || !partnerPay?.upiId || !payTarget) return;
+    const requests =
+      payTarget.mode === "all" ? payTarget.requests : [payTarget.req];
+    const amount = requests.reduce((s, r) => s + r.amount, 0);
+    const note =
+      requests.length === 1
+        ? `Settle ${requests[0]!.merchant}`
+        : `Settle ${requests.length} reimbursements`;
     try {
-      setBusyId(req.id);
-      await createSettlement({
-        reimbursementRequestId: req.id,
-        payerId: user.id,
-        payeeId: partnerPay.id,
-        payerName: user.displayName || user.email,
-        payeeName: partnerPay.displayName || req.requesterName,
-        merchant: req.merchant,
-        amount: req.amount,
-        method: "upi",
-        note: pendingConfirm.intent.note,
-        status: "payer_confirmed",
-      });
-      await markReimbursementPaid(req.id);
-      dismissConfirm();
-      setCelebration({
-        amountLabel: formatCurrency(req.amount, currency),
-        detail: `Waiting for ${req.requesterName} to confirm they received it`,
-      });
+      tapHaptic();
+      setBusyId(payTarget.mode === "all" ? "all" : payTarget.req.id);
+      setPayTarget(null);
+      await payNow(
+        requests.map((r) => r.id),
+        {
+          payeeUpi: partnerPay.upiId,
+          payeeName: partnerPay.displayName || requests[0]!.requesterName,
+          amount,
+          currency,
+          note,
+          preferredApp,
+        },
+      );
     } catch (err) {
-      show(err instanceof Error ? err.message : "Could not record settlement");
-    } finally {
+      show(err instanceof Error ? err.message : "Could not open UPI");
       setBusyId(null);
     }
   };
@@ -134,8 +200,22 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   const upiHint = partnerLoading
     ? "Checking partner UPI…"
     : hasPartnerUpi
-      ? `Pay via UPI to ${partnerPay?.upiId}`
-      : "Ask them to add UPI in Settings to enable Pay Now";
+      ? `Pays ${partnerPay?.upiId}`
+      : "Ask them to add UPI in Settings to enable Pay";
+
+  const payRequests =
+    payTarget == null
+      ? []
+      : payTarget.mode === "all"
+        ? payTarget.requests
+        : [payTarget.req];
+  const chooserAmount = payRequests.reduce((s, r) => s + r.amount, 0);
+  const payeeLabel =
+    partnerPay?.displayName || payRequests[0]?.requesterName || "Partner";
+  const paySubtitle =
+    payRequests.length > 1
+      ? `${payRequests.length} reimbursements`
+      : (payRequests[0]?.merchant ?? "");
 
   return (
     <>
@@ -144,13 +224,13 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
           <div>
             <p className="text-tagline text-ink">Reimbursements owed</p>
             <p className="text-caption text-ink-muted-48 mt-1">
-              Pay Now opens UPI, then confirm you paid. They still confirm receipt before it moves
-              off their account.
+              Pay opens your phone&apos;s UPI apps. When you return, we mark it paid — they still
+              confirm receipt.
             </p>
             <p className="text-caption text-ink-muted-48 mt-1">{upiHint}</p>
           </div>
 
-          <div className="flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 px-4 py-3">
+          <div className="flex flex-col gap-3 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-caption text-ink-muted-48">
                 {reimbursementsToPay.length === 1
@@ -158,10 +238,32 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
                   : `${reimbursementsToPay.length} pending refunds`}
               </p>
               <p className="text-caption-strong text-ink mt-0.5">Total to refund</p>
+              <p className="text-tagline text-primary font-semibold mt-1">
+                {formatCurrency(totalOwed, currency)}
+              </p>
             </div>
-            <p className="text-tagline text-primary font-semibold">
-              {formatCurrency(totalOwed, currency)}
-            </p>
+            {can.writeExpenses && (
+              <Button
+                variant="primary"
+                className="shrink-0 px-4 py-2"
+                disabled={
+                  !hasPartnerUpi ||
+                  busyId === "all" ||
+                  (reimbursementsToPay.length === 1 &&
+                    busyId === reimbursementsToPay[0]!.id)
+                }
+                data-testid="reimbursement-pay-all"
+                onClick={() =>
+                  openPaySheet(
+                    reimbursementsToPay.length === 1
+                      ? { mode: "single", req: reimbursementsToPay[0]! }
+                      : { mode: "all", requests: [...reimbursementsToPay] },
+                  )
+                }
+              >
+                Pay All
+              </Button>
+            )}
           </div>
 
           {reimbursementsToPay.map((req) => (
@@ -181,16 +283,16 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
                   <Button
                     variant="primary"
                     className="shrink-0 px-4 py-2"
-                    disabled={!hasPartnerUpi || busyId === req.id}
+                    disabled={!hasPartnerUpi || busyId === req.id || busyId === "all"}
                     data-testid={`reimbursement-pay-now-${req.id}`}
-                    onClick={() => void handlePayNow(req)}
+                    onClick={() => openPaySheet({ mode: "single", req })}
                   >
                     Pay Now
                   </Button>
                   <button
                     type="button"
                     className="text-caption text-ink-muted-48 underline-offset-2 hover:underline text-left sm:px-2"
-                    disabled={busyId === req.id}
+                    disabled={busyId === req.id || busyId === "all"}
                     data-testid={`reimbursement-mark-done-${req.id}`}
                     onClick={() => void handleMarkPaid(req.id, req.requesterName, req.amount)}
                   >
@@ -204,36 +306,55 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
       ) : null}
 
       <Sheet
-        open={Boolean(pendingConfirm)}
-        onClose={dismissConfirm}
-        title="Did the payment complete?"
+        open={Boolean(payTarget)}
+        onClose={() => setPayTarget(null)}
+        title="Pay"
         footer={
-          <div className="flex gap-3">
-            <Button variant="secondary" fullWidth onClick={dismissConfirm}>
-              No
-            </Button>
+          <div className="flex flex-col gap-3">
             <Button
               variant="primary"
               fullWidth
-              disabled={Boolean(busyId)}
-              onClick={() => void handleConfirmPaid()}
-              data-testid="settle-up-confirm-yes"
+              data-testid="upi-pay-native"
+              onClick={() => void launchPay("generic")}
             >
-              Yes, mark settled
+              Pay with UPI
             </Button>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+              {APP_SHORTCUTS.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  data-testid={`upi-app-${app.id}`}
+                  className="text-caption text-ink-muted-48 underline-offset-2 hover:underline hover:text-ink"
+                  onClick={() => void launchPay(app.id)}
+                >
+                  {app.label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       >
-        <p className="text-body text-ink">
-          If UPI finished successfully, we&apos;ll mark this reimbursement paid and save it to
-          settlement history. Your partner still needs to confirm they received it.
-        </p>
-        {pendingConfirm && (
-          <p className="text-caption text-ink-muted-48 mt-3">
-            {formatCurrency(pendingConfirm.intent.amount, currency)} to{" "}
-            {pendingConfirm.intent.payeeName} ({pendingConfirm.intent.payeeUpi})
+        <div className="flex flex-col items-center text-center pt-1 pb-2">
+          <div
+            className="mb-5 h-1 w-10 rounded-full bg-ink/15"
+            aria-hidden
+          />
+          <p className="text-caption text-ink-muted-48 uppercase tracking-wide">You pay</p>
+          <p className="text-[2rem] leading-tight font-semibold text-ink tabular-nums mt-1">
+            {formatCurrency(chooserAmount, currency)}
           </p>
-        )}
+          <p className="text-body text-ink mt-3">{payeeLabel}</p>
+          {partnerPay?.upiId && (
+            <p className="text-caption text-ink-muted-48 mt-1 select-all">{partnerPay.upiId}</p>
+          )}
+          {paySubtitle && (
+            <p className="text-caption text-ink-muted-48 mt-3">{paySubtitle}</p>
+          )}
+          <p className="text-caption text-ink-muted-48 mt-4 max-w-xs">
+            Your phone will show the UPI apps you have installed — GPay, PhonePe, and others.
+          </p>
+        </div>
       </Sheet>
 
       <SuccessOverlay
