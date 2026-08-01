@@ -15,8 +15,20 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-/** Query string shared by upi:// and Android intent:// forms. */
-function buildUpiQuery(input: CreatePaymentInput): { pa: string; query: string } {
+/** Android package names so we open a specific app instead of the default (e.g. WhatsApp). */
+const ANDROID_UPI_PACKAGES: Partial<
+  Record<NonNullable<CreatePaymentInput["preferredApp"]>, string>
+> = {
+  gpay: "com.google.android.apps.nbu.paisa.user",
+  phonepe: "com.phonepe.app",
+  paytm: "net.one97.paytm",
+  bhim: "in.org.npci.upiapp",
+  whatsapp: "com.whatsapp",
+  amazonpay: "in.amazon.mShop.android.shopping",
+  supermoney: "money.super.payments",
+};
+
+function buildUpiQuery(input: CreatePaymentInput): string {
   const pa = normalizeUpiId(input.payeeUpi);
   if (!isValidUpiId(pa)) {
     throw new Error("Invalid UPI ID. Use a format like name@oksbi.");
@@ -32,17 +44,32 @@ function buildUpiQuery(input: CreatePaymentInput): { pa: string; query: string }
   });
   const note = input.note?.trim();
   if (note) params.set("tn", note.slice(0, 80));
-  return { pa, query: params.toString() };
+  return params.toString();
+}
+
+function androidIntentUpi(query: string, pkg?: string): string {
+  const packagePart = pkg ? `package=${pkg};` : "";
+  return (
+    `intent://pay?${query}` +
+    `#Intent;scheme=upi;action=android.intent.action.VIEW;` +
+    `category=android.intent.category.BROWSABLE;${packagePart}end`
+  );
 }
 
 /**
- * Build a launch URI. For generic on Android, use Chrome's intent:// form so the
- * system can show every installed app that handles UPI (GPay, PhonePe, etc.).
+ * Build a launch URI for a preferred UPI app (best-effort deep link / Android package).
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
-  const { query } = buildUpiQuery(input);
+  const query = buildUpiQuery(input);
+  const app = input.preferredApp ?? "generic";
+  const android = isAndroid();
 
-  switch (input.preferredApp) {
+  if (android && app !== "generic") {
+    const pkg = ANDROID_UPI_PACKAGES[app];
+    if (pkg) return androidIntentUpi(query, pkg);
+  }
+
+  switch (app) {
     case "gpay":
       return `tez://upi/pay?${query}`;
     case "phonepe":
@@ -51,24 +78,21 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
       return `paytmmp://pay?${query}`;
     case "bhim":
       return `bhim://upi/pay?${query}`;
+    case "whatsapp":
+    case "amazonpay":
+    case "supermoney":
+      // No reliable iOS custom scheme — fall back to generic UPI.
+      return `upi://pay?${query}`;
     case "generic":
     default:
-      if (isAndroid()) {
-        // No package= → Android resolves all UPI handlers and shows the native chooser
-        // (or the default app if the user set one).
-        return (
-          `intent://pay?${query}` +
-          "#Intent;scheme=upi;action=android.intent.action.VIEW;" +
-          "category=android.intent.category.BROWSABLE;end"
-        );
-      }
+      if (android) return androidIntentUpi(query);
       return `upi://pay?${query}`;
   }
 }
 
 /**
  * Must run in the same user-gesture turn as the tap (no await before this),
- * or mobile browsers may refuse to open the native UPI chooser.
+ * or mobile browsers may refuse to open the UPI app.
  */
 export function launchUpiUri(uri: string): void {
   window.location.href = uri;

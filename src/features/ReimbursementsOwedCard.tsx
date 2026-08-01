@@ -15,6 +15,7 @@ import {
   type PartnerPaymentInfo,
 } from "@/payments/settlementsApi";
 import { useSettleUpPayment } from "@/payments/useSettleUpPayment";
+import { UPI_APP_OPTIONS, type UpiPreferredApp } from "@/payments/upiApps";
 import type { ReimbursementRequest } from "@/lib/types";
 
 type PayTarget =
@@ -102,7 +103,7 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     setPayTarget(target);
   };
 
-  const launchPay = () => {
+  const launchWithApp = (app: UpiPreferredApp) => {
     if (!user || !partnerPay?.upiId || !payTarget) return;
     const requests =
       payTarget.mode === "all" ? payTarget.requests : [payTarget.req];
@@ -115,13 +116,14 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     const busy = payTarget.mode === "all" ? "all" : payTarget.req.id;
     try {
       tapHaptic();
+      // Launch in the same tap turn so the OS allows the deep link.
       payNow(ids, {
         payeeUpi: partnerPay.upiId,
         payeeName: partnerPay.displayName || requests[0]!.requesterName,
         amount,
         currency,
         note,
-        preferredApp: "generic",
+        preferredApp: app,
       });
       setBusyId(busy);
       setPayTarget(null);
@@ -185,7 +187,6 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     dismissReturn();
     setBusyId(null);
     try {
-      // Audit only — leave reimbursements pending so they can retry.
       for (const req of toRecord) {
         await createSettlement({
           reimbursementRequestId: req.id,
@@ -241,8 +242,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
           <div>
             <p className="text-tagline text-ink">Reimbursements owed</p>
             <p className="text-caption text-ink-muted-48 mt-1">
-              Pay opens your phone&apos;s UPI apps. After you return, tell us if it succeeded or
-              failed — they still confirm receipt.
+              Pay All / Pay Now opens a sheet to pick GPay, PhonePe, and other UPI apps. After you
+              return, tell us if it succeeded — they still confirm receipt.
             </p>
             <p className="text-caption text-ink-muted-48 mt-1">{upiHint}</p>
           </div>
@@ -322,39 +323,54 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
         </Card>
       ) : null}
 
-      <Sheet
-        open={Boolean(payTarget)}
-        onClose={() => setPayTarget(null)}
-        title="Pay"
-        footer={
-          <Button
-            variant="primary"
-            fullWidth
-            data-testid="upi-pay-native"
-            onClick={launchPay}
-          >
-            Pay with UPI
-          </Button>
-        }
-      >
+      <Sheet open={Boolean(payTarget)} onClose={() => setPayTarget(null)} title="Pay with UPI">
         <div className="flex flex-col items-center text-center pt-1 pb-2">
-          <div className="mb-5 h-1 w-10 rounded-full bg-ink/15" aria-hidden />
+          <div className="mb-4 h-1 w-10 rounded-full bg-ink/15" aria-hidden />
           <p className="text-caption text-ink-muted-48 uppercase tracking-wide">You pay</p>
           <p className="text-[2rem] leading-tight font-semibold text-ink tabular-nums mt-1">
             {formatCurrency(chooserAmount, currency)}
           </p>
-          <p className="text-body text-ink mt-3">{payeeLabel}</p>
+          <p className="text-body text-ink mt-2">{payeeLabel}</p>
           {partnerPay?.upiId && (
             <p className="text-caption text-ink-muted-48 mt-1 select-all">{partnerPay.upiId}</p>
           )}
-          {paySubtitle && (
-            <p className="text-caption text-ink-muted-48 mt-3">{paySubtitle}</p>
-          )}
-          <p className="text-caption text-ink-muted-48 mt-4 max-w-xs">
-            Next, your phone lists every UPI / payment app installed on this device. Pick one to
-            pay.
-          </p>
+          {paySubtitle ? (
+            <p className="text-caption text-ink-muted-48 mt-2">{paySubtitle}</p>
+          ) : null}
         </div>
+
+        <p className="text-caption-strong text-ink mt-4 mb-3">Choose a UPI app</p>
+        <div
+          className="grid grid-cols-3 gap-3 sm:grid-cols-4"
+          data-testid="upi-app-picker"
+        >
+          {UPI_APP_OPTIONS.map((app) => (
+            <button
+              key={app.id}
+              type="button"
+              data-testid={`upi-app-${app.id}`}
+              className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-canvas px-2 py-3 active:scale-95 transition-transform"
+              onClick={() => launchWithApp(app.id)}
+            >
+              <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white border border-hairline">
+                <img
+                  src={app.logo}
+                  alt=""
+                  width={48}
+                  height={48}
+                  className="h-full w-full object-contain p-1"
+                  draggable={false}
+                />
+              </span>
+              <span className="text-caption text-ink text-center leading-tight">
+                {app.shortLabel}
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="text-caption text-ink-muted-48 mt-4 text-center">
+          Opens the app you pick. If it isn&apos;t installed, try another or Other.
+        </p>
       </Sheet>
 
       <Sheet
@@ -393,8 +409,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
         </p>
         {pendingReturn && (
           <p className="text-caption text-ink-muted-48 mt-3">
-            {formatCurrency(resultAmount, currency)} to{" "}
-            {pendingReturn.intent.payeeName} ({pendingReturn.intent.payeeUpi})
+            {formatCurrency(resultAmount, currency)} to {pendingReturn.intent.payeeName} (
+            {pendingReturn.intent.payeeUpi})
           </p>
         )}
       </Sheet>

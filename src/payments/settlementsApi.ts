@@ -78,3 +78,19 @@ export async function listSettlements(): Promise<Settlement[]> {
   if (error) throw new Error(error.message);
   return (data ?? []).map(toSettlement);
 }
+
+/** Deletes all settlement history rows where the current user is payer or payee. */
+export async function clearSettlementHistory(): Promise<number> {
+  if (!isSupabaseEnabled()) throw new Error("Supabase is required for settlements.");
+  const { data: auth } = await getSupabase().auth.getUser();
+  const userId = auth.user?.id;
+  if (!userId) throw new Error("Not authenticated");
+
+  const { data, error } = await getSupabase()
+    .from("settlements")
+    .delete()
+    .or(`payer_id.eq.${userId},payee_id.eq.${userId}`)
+    .select("id");
+  if (error) throw new Error(error.message);
+  return data?.length ?? 0;
+}

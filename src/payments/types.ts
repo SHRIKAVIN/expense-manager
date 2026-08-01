@@ -8,8 +8,16 @@ export interface CreatePaymentInput {
   amount: number;
   currency?: string;
   note?: string;
-  /** Soft hint only — browsers cannot reliably force a specific UPI app. */
-  preferredApp?: "gpay" | "phonepe" | "paytm" | "bhim" | "generic";
+  /** Soft hint — browsers cannot reliably force a specific UPI app. */
+  preferredApp?:
+    | "gpay"
+    | "phonepe"
+    | "paytm"
+    | "bhim"
+    | "whatsapp"
+    | "amazonpay"
+    | "supermoney"
+    | "generic";
 }
 
 export interface PaymentIntent {

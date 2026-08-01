@@ -8,7 +8,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { CategorySheet } from "@/features/CategorySheet";
 import { RecurringSheet } from "@/features/RecurringSheet";
 import { useAuth } from "@/auth/AuthProvider";
-import { isQuickSwitchEmail } from "@/auth/quickSwitch";
+import { getReimbursementPartner, isQuickSwitchEmail } from "@/auth/quickSwitch";
 import { useAppData } from "@/data/AppDataProvider";
 import { useToast } from "@/components/Toast";
 import { usePwaInstall } from "@/lib/usePwaInstall";
@@ -46,7 +46,7 @@ import {
 import { formatCurrency, formatDateTime, relativeDue } from "@/lib/format";
 import { exportExpensesPdf } from "@/lib/exportPdf";
 import { isValidUpiId, normalizeUpiId } from "@/payments/upi";
-import { listSettlements } from "@/payments/settlementsApi";
+import { clearSettlementHistory, listSettlements } from "@/payments/settlementsApi";
 import type { Category, Recurring, Settlement } from "@/lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -88,6 +88,7 @@ export function SettingsScreen() {
   const [pushStatus, setPushStatus] = useState<PushSetupStatus | null>(null);
   const [testingPush, setTestingPush] = useState(false);
   const showPartnerAlerts = Boolean(user?.email && isQuickSwitchEmail(user.email));
+  const hasPartner = Boolean(user?.email && getReimbursementPartner(user.email));
 
   const [catSheet, setCatSheet] = useState<{ open: boolean; editing: Category | null }>({
     open: false,
@@ -98,6 +99,8 @@ export function SettingsScreen() {
     editing: null,
   });
   const [confirmCategory, setConfirmCategory] = useState<Category | null>(null);
+  const [confirmClearSettlements, setConfirmClearSettlements] = useState(false);
+  const [clearingSettlements, setClearingSettlements] = useState(false);
 
   const confirmCategoryExpenseCount = useMemo(() => {
     if (!confirmCategory) return 0;
@@ -153,7 +156,11 @@ export function SettingsScreen() {
   }, [user?.upiId, user?.phone]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || !hasPartner) {
+      setSettlements([]);
+      setSettlementsLoading(false);
+      return;
+    }
     let cancelled = false;
     setSettlementsLoading(true);
     void listSettlements()
@@ -169,7 +176,7 @@ export function SettingsScreen() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, hasPartner]);
 
   const activeCategories = categories.filter((c) => !c.archived);
 
@@ -192,6 +199,21 @@ export function SettingsScreen() {
       show("Payment details saved");
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not save payment details");
+    }
+  };
+
+  const clearSettlements = async () => {
+    if (clearingSettlements) return;
+    try {
+      setClearingSettlements(true);
+      const count = await clearSettlementHistory();
+      setSettlements([]);
+      setConfirmClearSettlements(false);
+      show(count > 0 ? `Cleared ${count} settlement${count === 1 ? "" : "s"}` : "History already empty");
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Could not clear settlement history");
+    } finally {
+      setClearingSettlements(false);
     }
   };
 
@@ -362,83 +384,99 @@ export function SettingsScreen() {
           </Card>
         </Section>
 
-        {/* Settle Up / UPI */}
-        <Section title="Settle Up">
-          <Card className="flex flex-col gap-5" data-testid="settings-settle-up">
-            <TextField
-              label="UPI ID"
-              value={upiId}
-              onChange={(e) => setUpiId(e.target.value)}
-              placeholder="name@oksbi"
-              disabled={isQuickSwitchViewOnly}
-              data-testid="settings-upi-id"
-            />
-            <TextField
-              label="Phone (optional)"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="For partner reference"
-              disabled={isQuickSwitchViewOnly}
-              data-testid="settings-phone"
-            />
-            <p className="text-caption text-ink-muted-48 -mt-2">
-              Your partner uses this UPI ID when they tap Pay Now. Add yours so they can settle
-              quickly.
-            </p>
-            <Button
-              variant="primary"
-              onClick={() => void savePayments()}
-              disabled={!canSavePayments}
-              data-testid="settings-save-payments"
-            >
-              Save payment details
-            </Button>
-          </Card>
-        </Section>
+        {/* Settle Up / UPI — only when a reimbursement partner exists */}
+        {hasPartner && (
+          <Section title="Settle Up">
+            <Card className="flex flex-col gap-5" data-testid="settings-settle-up">
+              <TextField
+                label="UPI ID"
+                value={upiId}
+                onChange={(e) => setUpiId(e.target.value)}
+                placeholder="name@oksbi"
+                disabled={isQuickSwitchViewOnly}
+                data-testid="settings-upi-id"
+              />
+              <TextField
+                label="Phone (optional)"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="For partner reference"
+                disabled={isQuickSwitchViewOnly}
+                data-testid="settings-phone"
+              />
+              <p className="text-caption text-ink-muted-48 -mt-2">
+                Your partner uses this UPI ID when they tap Pay Now. Add yours so they can settle
+                quickly.
+              </p>
+              <Button
+                variant="primary"
+                onClick={() => void savePayments()}
+                disabled={!canSavePayments}
+                data-testid="settings-save-payments"
+              >
+                Save payment details
+              </Button>
+            </Card>
+          </Section>
+        )}
 
         {/* Settlement history */}
-        <Section title="Settlement history">
-          <Card padded={false} className="overflow-hidden" data-testid="settings-settlement-history">
-            {settlementsLoading && (
-              <p className="px-5 py-4 text-body text-ink-muted-48">Loading…</p>
-            )}
-            {!settlementsLoading && settlements.length === 0 && (
-              <p className="px-5 py-4 text-body text-ink-muted-48">
-                No settlements yet. Pay Now from a reimbursement creates a history entry.
-              </p>
-            )}
-            {settlements.map((s) => {
-              const iPaid = s.payerId === user?.id;
-              const partnerLabel = iPaid ? s.payeeName || "Partner" : s.payerName || "Partner";
-              return (
-                <div
-                  key={s.id}
-                  className="flex flex-col gap-0.5 px-5 py-3 border-b border-divider-soft last:border-b-0"
-                  data-testid={`settlement-row-${s.id}`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-body text-ink truncate">
-                      {iPaid ? `Paid ${partnerLabel}` : `Received from ${partnerLabel}`}
-                    </p>
-                    <p className="text-body-strong text-ink shrink-0">
-                      {formatCurrency(s.amount, currency)}
+        {hasPartner && (
+          <Section title="Settlement history">
+            <Card padded={false} className="overflow-hidden" data-testid="settings-settlement-history">
+              {settlementsLoading && (
+                <p className="px-5 py-4 text-body text-ink-muted-48">Loading…</p>
+              )}
+              {!settlementsLoading && settlements.length === 0 && (
+                <p className="px-5 py-4 text-body text-ink-muted-48">
+                  No settlements yet. Pay Now from a reimbursement creates a history entry.
+                </p>
+              )}
+              {settlements.map((s) => {
+                const iPaid = s.payerId === user?.id;
+                const partnerLabel = iPaid ? s.payeeName || "Partner" : s.payerName || "Partner";
+                return (
+                  <div
+                    key={s.id}
+                    className="flex flex-col gap-0.5 px-5 py-3 border-b border-divider-soft last:border-b-0"
+                    data-testid={`settlement-row-${s.id}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-body text-ink truncate">
+                        {iPaid ? `Paid ${partnerLabel}` : `Received from ${partnerLabel}`}
+                      </p>
+                      <p className="text-body-strong text-ink shrink-0">
+                        {formatCurrency(s.amount, currency)}
+                      </p>
+                    </div>
+                    <p className="text-caption text-ink-muted-48">
+                      {[
+                        s.merchant,
+                        s.method.toUpperCase(),
+                        formatDateTime(s.settledAt ?? s.createdAt),
+                        s.note,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </p>
                   </div>
-                  <p className="text-caption text-ink-muted-48">
-                    {[
-                      s.merchant,
-                      s.method.toUpperCase(),
-                      formatDateTime(s.settledAt ?? s.createdAt),
-                      s.note,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
+                );
+              })}
+              {!settlementsLoading && settlements.length > 0 && !isQuickSwitchViewOnly && (
+                <div className="px-5 py-3 border-t border-divider-soft">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    data-testid="settings-clear-settlements"
+                    onClick={() => setConfirmClearSettlements(true)}
+                  >
+                    Clear history
+                  </Button>
                 </div>
-              );
-            })}
-          </Card>
-        </Section>
+              )}
+            </Card>
+          </Section>
+        )}
 
         {/* Appearance */}
         <Section title="Appearance">
@@ -698,6 +736,16 @@ export function SettingsScreen() {
         confirmLabel="Delete"
         onConfirm={() => void confirmDeleteCategory()}
         onClose={() => setConfirmCategory(null)}
+      />
+      <ConfirmDialog
+        open={confirmClearSettlements}
+        title="Clear settlement history?"
+        message="This permanently deletes all settlement history for you and your partner. Reimbursements themselves are not changed."
+        confirmLabel={clearingSettlements ? "Clearing…" : "Clear history"}
+        onConfirm={() => void clearSettlements()}
+        onClose={() => {
+          if (!clearingSettlements) setConfirmClearSettlements(false);
+        }}
       />
     </Screen>
   );

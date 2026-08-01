@@ -532,6 +532,8 @@ create policy "settlements_insert_payer" on public.settlements for insert
   with check (auth.uid() = payer_id);
 create policy "settlements_update_participant" on public.settlements for update
   using (auth.uid() = payer_id or auth.uid() = payee_id);
+create policy "settlements_delete_participant" on public.settlements for delete
+  using (auth.uid() = payer_id or auth.uid() = payee_id);
 
 create or replace function public.get_partner_payment_info(partner_email text)
 returns table (
