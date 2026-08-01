@@ -39,6 +39,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   const [partnerLoading, setPartnerLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [payTarget, setPayTarget] = useState<PayTarget | null>(null);
+  /** First: choose UPI vs mark outside; then optionally pick a UPI app. */
+  const [payStep, setPayStep] = useState<"choose" | "upi">("choose");
   const [celebration, setCelebration] = useState<{
     amountLabel: string;
     detail: string;
@@ -75,32 +77,28 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     return null;
   }
 
-  const handleMarkPaid = async (id: string, name: string, amount: number) => {
-    try {
-      setBusyId(id);
-      await markReimbursementPaid(id);
-      setCelebration({
-        amountLabel: formatCurrency(amount, currency),
-        detail: `Waiting for ${name} to confirm they received it`,
-      });
-    } catch (err) {
-      show(err instanceof Error ? err.message : "Could not mark reimbursement paid");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const openPaySheet = (target: PayTarget) => {
     if (isOffline()) {
-      show("You're offline — use Mark paid without UPI when online, or wait for a connection");
+      show("You're offline — reconnect to settle up");
       return;
     }
+    tapHaptic();
+    setPayStep("choose");
+    setPayTarget(target);
+  };
+
+  const closePaySheet = () => {
+    setPayTarget(null);
+    setPayStep("choose");
+  };
+
+  const goToUpiApps = () => {
     if (!partnerPay?.upiId) {
       show("Ask them to add their UPI ID in Settings");
       return;
     }
     tapHaptic();
-    setPayTarget(target);
+    setPayStep("upi");
   };
 
   const launchWithApp = (app: UpiPreferredApp) => {
@@ -126,24 +124,20 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
         preferredApp: app,
       });
       setBusyId(busy);
-      setPayTarget(null);
+      closePaySheet();
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not open UPI");
       setBusyId(null);
     }
   };
 
-  const handlePaymentSuccess = async () => {
-    if (!pendingReturn || !user || !partnerPay || settlingRef.current) return;
-    const { reimbursementIds: ids, intent } = pendingReturn;
-    const toSettle = reimbursementsToPay.filter((r) => ids.includes(r.id));
-    dismissReturn();
-    if (toSettle.length === 0) {
-      show("Those reimbursements are no longer pending");
-      return;
-    }
+  const recordSettlements = async (
+    toSettle: ReimbursementRequest[],
+    opts: { method: "upi" | "other"; note?: string },
+  ) => {
+    if (!user || !partnerPay || settlingRef.current || toSettle.length === 0) return;
     settlingRef.current = true;
-    setBusyId(ids.length > 1 ? "all" : ids[0]!);
+    setBusyId(toSettle.length > 1 ? "all" : toSettle[0]!.id);
     try {
       for (const req of toSettle) {
         await createSettlement({
@@ -154,14 +148,15 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
           payeeName: partnerPay.displayName || req.requesterName,
           merchant: req.merchant,
           amount: req.amount,
-          method: "upi",
-          note: intent.note ?? `Settle ${req.merchant}`,
+          method: opts.method,
+          note: opts.note ?? `Settle ${req.merchant}`,
           status: "payer_confirmed",
         });
         await markReimbursementPaid(req.id);
       }
       const total = toSettle.reduce((s, r) => s + r.amount, 0);
       const name = toSettle[0]?.requesterName ?? "partner";
+      closePaySheet();
       setCelebration({
         amountLabel: formatCurrency(total, currency),
         detail:
@@ -177,19 +172,60 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     }
   };
 
+  const handlePaymentSuccess = async () => {
+    if (!pendingReturn || !user || !partnerPay) return;
+    const { reimbursementIds: ids, intent } = pendingReturn;
+    const toSettle = reimbursementsToPay.filter((r) => ids.includes(r.id));
+    dismissReturn();
+    if (toSettle.length === 0) {
+      show("Those reimbursements are no longer pending");
+      return;
+    }
+    await recordSettlements(toSettle, {
+      method: "upi",
+      note: intent.note ?? undefined,
+    });
+  };
+
   const handlePaymentFailed = () => {
     dismissReturn();
     setBusyId(null);
     show("Marked as failed — still unpaid. Try Pay again when ready.");
   };
 
+  const handlePaidOutside = async () => {
+    if (!payTarget || !user || !partnerPay) {
+      if (!partnerPay) show("Could not load partner details — try again");
+      return;
+    }
+    const toSettle =
+      payTarget.mode === "all" ? payTarget.requests : [payTarget.req];
+    const stillPending = reimbursementsToPay.filter((r) =>
+      toSettle.some((t) => t.id === r.id),
+    );
+    if (stillPending.length === 0) {
+      show("Those reimbursements are no longer pending");
+      closePaySheet();
+      return;
+    }
+    await recordSettlements(stillPending, {
+      method: "other",
+      note:
+        stillPending.length === 1
+          ? `Paid outside — ${stillPending[0]!.merchant}`
+          : `Paid outside — ${stillPending.length} reimbursements`,
+    });
+  };
+
   const totalOwed = reimbursementsToPay.reduce((sum, req) => sum + req.amount, 0);
   const hasPartnerUpi = Boolean(partnerPay?.upiId);
   const upiHint = partnerLoading
-    ? "Checking partner UPI…"
+    ? "Checking partner…"
     : hasPartnerUpi
       ? `Pays ${partnerPay?.upiId}`
-      : "Ask them to add UPI in Settings to enable Pay";
+      : partnerPay
+        ? "No UPI yet — mark paid outside, or ask them to add one"
+        : "Partner details unavailable";
 
   const payRequests =
     payTarget == null
@@ -215,55 +251,44 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     <>
       {reimbursementsToPay.length > 0 ? (
         <Card className="mb-4 flex flex-col gap-3" data-testid="reimbursements-owed">
-          <div>
-            <p className="text-tagline text-ink">Reimbursements owed</p>
-            <p className="text-caption text-ink-muted-48 mt-1">
-              Pay All / Pay Now opens a sheet to pick GPay, PhonePe, and other UPI apps. After you
-              return, tell us if it succeeded — they still confirm receipt.
-            </p>
-            <p className="text-caption text-ink-muted-48 mt-1">{upiHint}</p>
-          </div>
-
-          <div className="flex flex-col gap-3 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-caption text-ink-muted-48">
-                {reimbursementsToPay.length === 1
-                  ? "1 pending refund"
-                  : `${reimbursementsToPay.length} pending refunds`}
-              </p>
-              <p className="text-caption-strong text-ink mt-0.5">Total to refund</p>
-              <p className="text-tagline text-primary font-semibold mt-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-tagline text-ink">Reimbursements owed</p>
+              <p className="text-caption text-ink-muted-48 mt-1 truncate">{upiHint}</p>
+            </div>
+            {reimbursementsToPay.length > 1 && (
+              <p className="text-body-strong text-primary tabular-nums shrink-0 pt-0.5">
                 {formatCurrency(totalOwed, currency)}
               </p>
-            </div>
-            {can.writeExpenses && (
+            )}
+          </div>
+
+          {reimbursementsToPay.length > 1 && can.writeExpenses && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-primary/25 bg-primary/10 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-caption-strong text-ink">Pay everything</p>
+                <p className="text-caption text-ink-muted-48 mt-0.5">
+                  {reimbursementsToPay.length} refunds · {formatCurrency(totalOwed, currency)}
+                </p>
+              </div>
               <Button
                 variant="primary"
                 className="shrink-0 px-4 py-2"
-                disabled={
-                  !hasPartnerUpi ||
-                  busyId === "all" ||
-                  (reimbursementsToPay.length === 1 &&
-                    busyId === reimbursementsToPay[0]!.id)
-                }
+                disabled={busyId === "all"}
                 data-testid="reimbursement-pay-all"
                 onClick={() =>
-                  openPaySheet(
-                    reimbursementsToPay.length === 1
-                      ? { mode: "single", req: reimbursementsToPay[0]! }
-                      : { mode: "all", requests: [...reimbursementsToPay] },
-                  )
+                  openPaySheet({ mode: "all", requests: [...reimbursementsToPay] })
                 }
               >
                 Pay All
               </Button>
-            )}
-          </div>
+            </div>
+          )}
 
           {reimbursementsToPay.map((req) => (
             <div
               key={req.id}
-              className="flex flex-col gap-2 rounded-md border border-hairline bg-canvas-parchment px-4 py-3"
+              className="flex items-center gap-3 rounded-md border border-hairline bg-canvas-parchment px-4 py-3"
               data-testid={`reimbursement-owed-${req.id}`}
             >
               <div className="min-w-0 flex-1">
@@ -273,33 +298,26 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
                 </p>
               </div>
               {can.writeExpenses && (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <Button
-                    variant="primary"
-                    className="shrink-0 px-4 py-2"
-                    disabled={!hasPartnerUpi || busyId === req.id || busyId === "all"}
-                    data-testid={`reimbursement-pay-now-${req.id}`}
-                    onClick={() => openPaySheet({ mode: "single", req })}
-                  >
-                    Pay Now
-                  </Button>
-                  <button
-                    type="button"
-                    className="text-caption text-ink-muted-48 underline-offset-2 hover:underline text-left sm:px-2"
-                    disabled={busyId === req.id || busyId === "all"}
-                    data-testid={`reimbursement-mark-done-${req.id}`}
-                    onClick={() => void handleMarkPaid(req.id, req.requesterName, req.amount)}
-                  >
-                    Mark paid without UPI
-                  </button>
-                </div>
+                <Button
+                  variant="primary"
+                  className="shrink-0 px-4 py-2"
+                  disabled={busyId === req.id || busyId === "all"}
+                  data-testid={`reimbursement-pay-now-${req.id}`}
+                  onClick={() => openPaySheet({ mode: "single", req })}
+                >
+                  Pay Now
+                </Button>
               )}
             </div>
           ))}
         </Card>
       ) : null}
 
-      <Sheet open={Boolean(payTarget)} onClose={() => setPayTarget(null)} title="Pay with UPI">
+      <Sheet
+        open={Boolean(payTarget)}
+        onClose={closePaySheet}
+        title={payStep === "upi" ? "Pay with UPI" : "How do you want to pay?"}
+      >
         <div className="flex flex-col items-center text-center pt-1 pb-2">
           <div className="mb-4 h-1 w-10 rounded-full bg-ink/15" aria-hidden />
           <p className="text-caption text-ink-muted-48 uppercase tracking-wide">You pay</p>
@@ -315,38 +333,79 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
           ) : null}
         </div>
 
-        <p className="text-caption-strong text-ink mt-4 mb-3">Choose a UPI app</p>
-        <div
-          className="grid grid-cols-3 gap-3 sm:grid-cols-4"
-          data-testid="upi-app-picker"
-        >
-          {UPI_APP_OPTIONS.map((app) => (
+        {payStep === "choose" ? (
+          <div className="flex flex-col gap-3 mt-4" data-testid="pay-method-chooser">
             <button
-              key={app.id}
               type="button"
-              data-testid={`upi-app-${app.id}`}
-              className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-canvas px-2 py-3 active:scale-95 transition-transform"
-              onClick={() => launchWithApp(app.id)}
+              data-testid="pay-method-upi"
+              disabled={!hasPartnerUpi || Boolean(busyId)}
+              className="flex flex-col items-start gap-1 rounded-xl border border-hairline bg-canvas px-4 py-3.5 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
+              onClick={goToUpiApps}
             >
-              <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white border border-hairline">
-                <img
-                  src={app.logo}
-                  alt=""
-                  width={48}
-                  height={48}
-                  className="h-full w-full object-contain p-1"
-                  draggable={false}
-                />
-              </span>
-              <span className="text-caption text-ink text-center leading-tight">
-                {app.shortLabel}
+              <span className="text-body-strong text-ink">Pay with UPI apps</span>
+              <span className="text-caption text-ink-muted-48">
+                {hasPartnerUpi
+                  ? "Open GPay, PhonePe, WhatsApp, or another UPI app"
+                  : "Partner needs to add a UPI ID in Settings first"}
               </span>
             </button>
-          ))}
-        </div>
-        <p className="text-caption text-ink-muted-48 mt-4 text-center">
-          Opens the app you pick. If it isn&apos;t installed, try another or Other.
-        </p>
+            <button
+              type="button"
+              data-testid="pay-method-outside"
+              disabled={Boolean(busyId) || !partnerPay}
+              className="flex flex-col items-start gap-1 rounded-xl border border-hairline bg-canvas px-4 py-3.5 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
+              onClick={() => void handlePaidOutside()}
+            >
+              <span className="text-body-strong text-ink">Paid outside — mark here</span>
+              <span className="text-caption text-ink-muted-48">
+                You already paid via bank, cash, or another app
+              </span>
+            </button>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="text-caption text-primary mt-2 mb-1 self-start"
+              data-testid="pay-method-back"
+              onClick={() => setPayStep("choose")}
+            >
+              ← Back
+            </button>
+            <p className="text-caption-strong text-ink mt-2 mb-3">Choose a UPI app</p>
+            <div
+              className="grid grid-cols-3 gap-3 sm:grid-cols-4"
+              data-testid="upi-app-picker"
+            >
+              {UPI_APP_OPTIONS.map((app) => (
+                <button
+                  key={app.id}
+                  type="button"
+                  data-testid={`upi-app-${app.id}`}
+                  className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-canvas px-2 py-3 active:scale-95 transition-transform"
+                  onClick={() => launchWithApp(app.id)}
+                >
+                  <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white border border-hairline">
+                    <img
+                      src={app.logo}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="h-full w-full object-contain p-1"
+                      draggable={false}
+                    />
+                  </span>
+                  <span className="text-caption text-ink text-center leading-tight">
+                    {app.shortLabel}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="text-caption text-ink-muted-48 mt-4 text-center">
+              Opens the app you pick. If it isn&apos;t installed, try another or Other.
+            </p>
+          </>
+        )}
       </Sheet>
 
       <Sheet

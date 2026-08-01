@@ -17,7 +17,11 @@ export function getSupabase(): SupabaseClient {
     );
   }
   if (!client) {
-    client = createClient(url, anonKey);
+    client = createClient(url, anonKey, {
+      realtime: {
+        params: { eventsPerSecond: 10 },
+      },
+    });
   }
   return client;
 }

@@ -38,7 +38,20 @@ self.addEventListener("push", (event) => {
     (async () => {
       const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const appVisible = clients.some((c) => c.visibilityState === "visible");
-      if (appVisible) return;
+      if (appVisible) {
+        // Realtime may be suspended in the PWA — nudge open clients to refresh.
+        await Promise.all(
+          clients.map((client) =>
+            client.postMessage({
+              type: "em-partner-push",
+              id: payload.id,
+              title,
+              body,
+            }),
+          ),
+        );
+        return;
+      }
 
       await incrementAppBadgeForNotification(payload.id);
       return self.registration.showNotification(title, {

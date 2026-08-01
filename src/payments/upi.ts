@@ -15,17 +15,13 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-/** Android package names so we open a specific app instead of the default (e.g. WhatsApp). */
+/** Android package names so we open a specific app instead of the default chooser. */
 const ANDROID_UPI_PACKAGES: Partial<
   Record<NonNullable<CreatePaymentInput["preferredApp"]>, string>
 > = {
   gpay: "com.google.android.apps.nbu.paisa.user",
   phonepe: "com.phonepe.app",
-  paytm: "net.one97.paytm",
-  bhim: "in.org.npci.upiapp",
   whatsapp: "com.whatsapp",
-  // Play Store: https://play.google.com/store/apps/details?id=money.super.payments
-  supermoney: "money.super.payments",
 };
 
 function buildUpiQuery(input: CreatePaymentInput): string {
@@ -56,12 +52,7 @@ function androidIntentUpi(query: string, pkg?: string): string {
   );
 }
 
-/**
- * Build a launch URI for a preferred UPI app.
- *
- * Note: https://pay.super.money does not resolve (no DNS). super.money is opened
- * via Android package intent (money.super.payments) or generic upi:// elsewhere.
- */
+/** Build a launch URI for a preferred UPI app. */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildUpiQuery(input);
   const app = input.preferredApp ?? "generic";
@@ -77,13 +68,7 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
       return `tez://upi/pay?${query}`;
     case "phonepe":
       return `phonepe://pay?${query}`;
-    case "paytm":
-      return `paytmmp://pay?${query}`;
-    case "bhim":
-      return `bhim://upi/pay?${query}`;
     case "whatsapp":
-    case "supermoney":
-      // No public HTTPS pay host / iOS scheme from super.money — use generic UPI.
       return `upi://pay?${query}`;
     case "generic":
     default:

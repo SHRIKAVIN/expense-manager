@@ -10,9 +10,7 @@ export type UpiAppOption = {
   logo: string;
 };
 
-/**
- * In-app picker order: GPay → PhonePe → super.money → Paytm → BHIM → WhatsApp → Other.
- */
+/** In-app picker order: GPay → PhonePe → WhatsApp → Other. */
 export const UPI_APP_OPTIONS: UpiAppOption[] = [
   {
     id: "gpay",
@@ -25,24 +23,6 @@ export const UPI_APP_OPTIONS: UpiAppOption[] = [
     label: "PhonePe",
     shortLabel: "PhonePe",
     logo: "/upi-logos/phonepe.png",
-  },
-  {
-    id: "supermoney",
-    label: "super.money",
-    shortLabel: "super.money",
-    logo: "/upi-logos/supermoney.png",
-  },
-  {
-    id: "paytm",
-    label: "Paytm",
-    shortLabel: "Paytm",
-    logo: "/upi-logos/paytm.png",
-  },
-  {
-    id: "bhim",
-    label: "BHIM",
-    shortLabel: "BHIM",
-    logo: "/upi-logos/bhim.png",
   },
   {
     id: "whatsapp",

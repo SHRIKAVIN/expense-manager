@@ -9,14 +9,7 @@ export interface CreatePaymentInput {
   currency?: string;
   note?: string;
   /** Soft hint — browsers cannot reliably force a specific UPI app. */
-  preferredApp?:
-    | "gpay"
-    | "phonepe"
-    | "paytm"
-    | "bhim"
-    | "whatsapp"
-    | "supermoney"
-    | "generic";
+  preferredApp?: "gpay" | "phonepe" | "whatsapp" | "generic";
 }
 
 export interface PaymentIntent {
