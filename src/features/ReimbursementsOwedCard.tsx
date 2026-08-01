@@ -163,14 +163,10 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   const goToUpiApps = () => {
     const target = payTargetRef.current;
     if (!partnerPay || !target) return;
-    // Prefer real VPA — bare phone→@upi often fails in GPay/PhonePe.
-    const payeeVpa = partnerPay.upiId?.trim() || partnerPay.phone?.trim();
-    if (!payeeVpa) {
-      show("Ask them to add their UPI ID in Settings (e.g. name@oksbi)");
+    const payeeVpa = partnerPay.upiId?.trim();
+    if (!payeeVpa || !payeeVpa.includes("@") || payeeVpa.endsWith("@upi")) {
+      show("Ask them to add a full UPI ID in Settings (e.g. name@ybl) — phone-only won’t work");
       return;
-    }
-    if (!partnerPay.upiId?.includes("@")) {
-      show("Use a full UPI ID in Settings (name@ybl), not only a phone number");
     }
     tapHaptic();
     setPayStep("upi");
@@ -265,16 +261,16 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   };
 
   const totalOwed = reimbursementsToPay.reduce((sum, req) => sum + req.amount, 0);
-  const hasPartnerUpi = Boolean(partnerPay?.upiId || partnerPay?.phone);
+  const hasPartnerUpi = Boolean(
+    partnerPay?.upiId?.includes("@") && !partnerPay.upiId.endsWith("@upi"),
+  );
   const upiHint = partnerLoading
     ? "Checking partner…"
-    : partnerPay?.upiId
-      ? `Pays ${partnerPay.upiId}`
-      : partnerPay?.phone
-        ? `Pays ${partnerPay.phone}`
-        : partnerPay
-          ? "No UPI yet — mark paid outside, or ask them to add one"
-          : "Partner details unavailable";
+    : hasPartnerUpi
+      ? `Pays ${partnerPay!.upiId}`
+      : partnerPay
+        ? "Add a full UPI ID in Settings (name@ybl) to enable Pay"
+        : "Partner details unavailable";
 
   const payRequests =
     payTarget == null

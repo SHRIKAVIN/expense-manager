@@ -21,14 +21,6 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-function isIOS(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return (
-    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
 /** Stable-enough txn ref for UPI `tr` (max ~35 chars commonly accepted). */
 export function createUpiTxnId(): string {
   const rand =
@@ -49,7 +41,7 @@ function androidIntentPay(query: string, pkg?: string): string {
 
 /**
  * App-specific UPI deep links for PWA / website.
- * Query uses encodeURIComponent + blank mc (see upiCheckoutLinks).
+ * Uses P2P query from upiCheckoutLinks (no mc/tr).
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildCheckoutUpiQuery({
@@ -72,14 +64,13 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
     if (app !== "generic" && pkgs[app]) {
       return androidIntentPay(query, pkgs[app]);
     }
-    if (app === "generic") return androidIntentPay(query);
   }
 
   switch (app) {
     case "gpay":
-      return isIOS() ? `gpay://upi/pay?${query}` : `tez://upi/pay?${query}`;
+      return `tez://upi/pay?${query}`;
     case "phonepe":
-      return `phonepe://upi/pay?${query}`;
+      return `phonepe://pay?${query}`;
     case "paytm":
       return `paytmmp://pay?${query}`;
     case "supermoney":

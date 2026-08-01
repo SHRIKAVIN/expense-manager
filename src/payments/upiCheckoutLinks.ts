@@ -60,14 +60,6 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-function isIOS(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return (
-    /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-  );
-}
-
 /** Strip characters PSPs often choke on in pn/tn. */
 function sanitizeUpiText(value: string, max: number): string {
   return value
@@ -83,35 +75,41 @@ export interface UpiLaunchParams {
   amount: number;
   currency?: string;
   note?: string;
-  /** Server ledger id — embedded as UPI `tr` (unique per attempt). */
+  /** Server ledger id — kept in our DB; only a short hint goes in `tn` for P2P. */
   transactionId: string;
 }
 
 /**
- * Build UPI query string.
- * IMPORTANT: use encodeURIComponent (not URLSearchParams) so spaces are %20,
- * not `+` — GPay/PhonePe often mis-parse `+` and show fake "bank limit" / QR flows.
+ * Person-to-person UPI query only: pa, pn, am, cu, tn.
  *
- * Include empty `mc` + unique `tr` — required by many PSP builds for intent pays.
+ * Do NOT send `mc` / `tr` for personal settle-up. Those flag a merchant (P2M) path;
+ * GPay then shows a fake "bank limit exceeded" for personal VPAs, and PhonePe
+ * often drops into Scan/QR gallery.
+ *
+ * encodeURIComponent (not URLSearchParams) so spaces are %20, not +.
  */
 export function buildCheckoutUpiQuery(params: UpiLaunchParams): string {
   const pa = assertPayeeVpa(params.payeeVpa);
   if (!(params.amount > 0)) throw new Error("Amount must be greater than 0.");
 
+  // Reject weak phone@upi — PSPs frequently reject it.
+  if (pa.endsWith("@upi")) {
+    throw new Error("Use a full UPI ID (e.g. name@ybl / name@oksbi), not phone@upi.");
+  }
+
   const am = Number(params.amount).toFixed(2);
   const pn = sanitizeUpiText(params.payeeName || "Payee", 50) || "Payee";
-  const tr = sanitizeUpiText(params.transactionId, 35).replace(/\s/g, "") || `EM${Date.now()}`;
-  const tn = sanitizeUpiText(params.note || "Reimbursement", 80) || "Reimbursement";
+  const shortRef = params.transactionId.replace(/[^a-zA-Z0-9]/g, "").slice(-8);
+  const baseNote = sanitizeUpiText(params.note || "Reimbursement", 60) || "Reimbursement";
+  const tn = sanitizeUpiText(`${baseNote} ${shortRef}`, 80);
   const cu = (params.currency ?? "INR").toUpperCase();
 
   const parts: Array<[string, string]> = [
     ["pa", pa],
     ["pn", pn],
-    ["mc", ""], // blank merchant code — P2P-safe; avoids false GPay limit errors
-    ["tr", tr],
-    ["tn", tn],
     ["am", am],
     ["cu", cu],
+    ["tn", tn],
   ];
 
   return parts
@@ -129,30 +127,28 @@ function androidIntentPay(query: string, pkg?: string): string {
 }
 
 /**
- * App-specific UPI deep links for PWA / mobile web.
- * SECURITY: URI alone is not payment proof — only server webhook / status is.
+ * Deep links for PWA settle-up (personal VPA / P2P).
+ * iOS: custom schemes only. Prefer tez:// for GPay (more reliable than gpay:// in India).
  */
 export function buildIosCheckoutUri(app: UpiCheckoutApp, params: UpiLaunchParams): string {
   const query = buildCheckoutUpiQuery(params);
 
-  // Android: package-targeted intent keeps amount/VPA intact (custom schemes often drop params).
   if (isAndroid()) {
     const pkg = ANDROID_PACKAGES[app];
     if (pkg) return androidIntentPay(query, pkg);
-    return androidIntentPay(query);
+    return `upi://pay?${query}`;
   }
 
+  // iOS / other: app schemes with the same P2P query.
   switch (app) {
-    case "supermoney":
-      return `upi://pay?${query}`;
     case "gpay":
-      // Google docs: gpay:// on iOS; tez:// also used widely in India.
-      return isIOS() ? `gpay://upi/pay?${query}` : `tez://upi/pay?${query}`;
+      // tez:// is the widely working GPay scheme on iPhone in India for P2P.
+      return `tez://upi/pay?${query}`;
     case "phonepe":
-      // Prefer upi host path — phonepe://pay without params often opens Scan/QR gallery.
-      return `phonepe://upi/pay?${query}`;
+      return `phonepe://pay?${query}`;
     case "paytm":
       return `paytmmp://pay?${query}`;
+    case "supermoney":
     default:
       return `upi://pay?${query}`;
   }
