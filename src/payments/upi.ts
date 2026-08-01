@@ -26,7 +26,7 @@ function isAndroid(): boolean {
   return typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 }
 
-/** Stable-enough txn ref for UPI `tr` (max ~35 chars commonly accepted). */
+/** Stable-enough txn ref for our ledger (not sent in WhatsApp deep links). */
 export function createUpiTxnId(): string {
   const rand =
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -35,18 +35,16 @@ export function createUpiTxnId(): string {
   return `EM${Date.now().toString(36)}${rand}`.slice(0, 35);
 }
 
-function androidIntentPay(query: string, pkg?: string): string {
-  const packagePart = pkg ? `package=${pkg};` : "";
+function androidIntentPay(query: string, pkg: string): string {
   return (
     `intent://pay?${query}` +
     `#Intent;scheme=upi;action=android.intent.action.VIEW;` +
-    `category=android.intent.category.BROWSABLE;${packagePart}end`
+    `category=android.intent.category.BROWSABLE;package=${pkg};end`
   );
 }
 
 /**
- * App-specific UPI deep links for PWA / website.
- * Uses P2P query from upiCheckoutLinks (no mc/tr).
+ * WhatsApp Pay deep link — no description (`tn`).
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildCheckoutUpiQuery({
@@ -54,36 +52,14 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
     payeeName: input.payeeName,
     amount: input.amount,
     currency: input.currency,
-    note: input.note,
     transactionId: input.transactionId?.trim() || createUpiTxnId(),
   });
-  const app = input.preferredApp ?? "generic";
 
   if (isAndroid()) {
-    const pkgs: Partial<Record<UpiApp, string>> = {
-      gpay: "com.google.android.apps.nbu.paisa.user",
-      phonepe: "com.phonepe.app",
-      paytm: "net.one97.paytm",
-      whatsapp: "com.whatsapp",
-    };
-    if (app !== "generic" && pkgs[app]) {
-      return androidIntentPay(query, pkgs[app]);
-    }
+    return androidIntentPay(query, "com.whatsapp");
   }
 
-  switch (app) {
-    case "gpay":
-      return `tez://upi/pay?${query}`;
-    case "phonepe":
-      return `phonepe://pay?${query}`;
-    case "paytm":
-      return `paytmmp://pay?${query}`;
-    case "supermoney":
-    case "whatsapp":
-    case "generic":
-    default:
-      return `upi://pay?${query}`;
-  }
+  return `upi://pay?${query}`;
 }
 
 /**
@@ -94,7 +70,7 @@ export function launchUpiUri(uri: string): void {
   window.location.href = uri;
 }
 
-/** Build + open a UPI deep link for the chosen app (sync — keep inside the tap). */
+/** Build + open a WhatsApp Pay deep link (sync — keep inside the tap). */
 export function openUpi(
   app: UpiApp,
   input: Omit<CreatePaymentInput, "preferredApp">,

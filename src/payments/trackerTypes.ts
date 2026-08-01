@@ -8,7 +8,7 @@
  * Bank callbacks must hit the server with a shared secret / mTLS.
  */
 
-export type UpiCheckoutApp = "supermoney" | "gpay" | "phonepe" | "paytm";
+export type UpiCheckoutApp = "whatsapp";
 
 export type UpiPaymentStatus = "PENDING" | "PAID" | "FAILED" | "EXPIRED";
 

@@ -11,7 +11,7 @@ export interface CreatePaymentInput {
   /** UPI `tr` — auto-generated when omitted. */
   transactionId?: string;
   /** Soft hint — browsers cannot reliably force a specific UPI app. */
-  preferredApp?: "gpay" | "phonepe" | "paytm" | "whatsapp" | "supermoney" | "generic";
+  preferredApp?: "whatsapp";
 }
 
 export interface PaymentIntent {

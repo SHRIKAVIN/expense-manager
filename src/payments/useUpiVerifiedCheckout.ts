@@ -248,7 +248,6 @@ export function useUpiVerifiedCheckout(opts: {
       payeeName: created.payeeName,
       amount: Number(created.amount),
       currency: created.currency,
-      note: created.note,
       transactionId: created.transactionId,
     });
 

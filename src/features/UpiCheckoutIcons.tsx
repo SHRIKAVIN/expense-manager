@@ -33,15 +33,15 @@ export function UpiCheckoutIcons({ disabled, phase, onSelect }: Props) {
         </div>
       )}
 
-      <p className="text-caption-strong text-ink mb-3">Choose a UPI app</p>
-      <div className="grid grid-cols-4 gap-3">
+      <p className="text-caption-strong text-ink mb-3">Pay with WhatsApp</p>
+      <div className="flex justify-center gap-3">
         {UPI_CHECKOUT_APPS.map((app) => (
           <button
             key={app.id}
             type="button"
             data-testid={`upi-app-${app.id}`}
             disabled={disabled || busy}
-            className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-canvas px-2 py-3 active:scale-95 transition-transform disabled:opacity-50"
+            className="flex flex-col items-center gap-2 rounded-xl border border-hairline bg-canvas px-6 py-3 active:scale-95 transition-transform disabled:opacity-50"
             onClick={() => onSelect(app.id)}
           >
             <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white border border-hairline">
@@ -60,8 +60,8 @@ export function UpiCheckoutIcons({ disabled, phase, onSelect }: Props) {
       </div>
       <p className="text-caption text-ink-muted-48 mt-4 text-center">
         {phase === "ready"
-          ? "Tap an app to pay the exact amount."
-          : "Opens the app on your phone. If it isn't installed, you'll be sent to the App Store."}
+          ? "Tap WhatsApp to pay the exact amount."
+          : "Opens WhatsApp on your phone. If it isn't installed, you'll be sent to the App Store."}
       </p>
     </div>
   );

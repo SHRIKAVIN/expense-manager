@@ -357,7 +357,7 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
       <Sheet
         open={Boolean(payTarget) && !showVerifySheet}
         onClose={closePaySheet}
-        title={payStep === "upi" ? "Pay with UPI" : "How do you want to pay?"}
+        title={payStep === "upi" ? "Pay with WhatsApp" : "How do you want to pay?"}
       >
         <div className="flex flex-col items-center text-center pt-1 pb-2">
           <div className="mb-4 h-1 w-10 rounded-full bg-ink/15" aria-hidden />
@@ -385,10 +385,10 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
               className="flex flex-col items-start gap-1 rounded-xl border border-hairline bg-canvas px-4 py-3.5 text-left active:scale-[0.99] transition-transform disabled:opacity-50"
               onClick={goToUpiApps}
             >
-              <span className="text-body-strong text-ink">Pay with UPI apps</span>
+              <span className="text-body-strong text-ink">Pay with WhatsApp</span>
               <span className="text-caption text-ink-muted-48">
                 {hasPartnerUpi
-                  ? "Open super.money, GPay, PhonePe, or Paytm"
+                  ? "Opens WhatsApp Pay with the amount filled in"
                   : "Partner needs to add a UPI ID in Settings first"}
               </span>
             </button>
