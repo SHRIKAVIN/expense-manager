@@ -1,16 +1,20 @@
 import type { CreatePaymentInput, PaymentIntent, PaymentProvider } from "./types";
-
-/** Basic UPI VPA: local@handle (letters, digits, ., _, -). */
-const UPI_VPA_RE = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
+import { buildCheckoutUpiQuery } from "./upiCheckoutLinks";
+import { assertPayeeVpa } from "./upiVpa";
 
 export type UpiApp = NonNullable<CreatePaymentInput["preferredApp"]>;
 
 export function isValidUpiId(upi: string): boolean {
-  return UPI_VPA_RE.test(upi.trim());
+  try {
+    assertPayeeVpa(upi);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function normalizeUpiId(upi: string): string {
-  return upi.trim().toLowerCase();
+  return assertPayeeVpa(upi);
 }
 
 function isAndroid(): boolean {
@@ -34,48 +38,51 @@ export function createUpiTxnId(): string {
   return `EM${Date.now().toString(36)}${rand}`.slice(0, 35);
 }
 
-function buildUpiQuery(input: CreatePaymentInput): string {
-  const pa = normalizeUpiId(input.payeeUpi);
-  if (!isValidUpiId(pa)) {
-    throw new Error("Invalid UPI ID. Use a format like name@oksbi.");
-  }
-  if (!(input.amount > 0)) {
-    throw new Error("Amount must be greater than 0.");
-  }
-  const params = new URLSearchParams({
-    pa,
-    pn: input.payeeName.trim() || "Payee",
-    tr: (input.transactionId?.trim() || createUpiTxnId()).slice(0, 35),
-    am: input.amount.toFixed(2),
-    cu: (input.currency ?? "INR").toUpperCase(),
-  });
-  const note = input.note?.trim();
-  if (note) params.set("tn", note.slice(0, 80));
-  return params.toString();
+function androidIntentPay(query: string, pkg?: string): string {
+  const packagePart = pkg ? `package=${pkg};` : "";
+  return (
+    `intent://pay?${query}` +
+    `#Intent;scheme=upi;action=android.intent.action.VIEW;` +
+    `category=android.intent.category.BROWSABLE;${packagePart}end`
+  );
 }
 
 /**
  * App-specific UPI deep links for PWA / website.
- * - GPay Android: tez://upi/pay
- * - GPay iOS: gpay://upi/pay
- * - PhonePe: phonepe://pay
- * - Paytm: paytmmp://pay
- * - SuperMoney / WhatsApp / Other: upi://pay
+ * Query uses encodeURIComponent + blank mc (see upiCheckoutLinks).
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
-  const query = buildUpiQuery(input);
+  const query = buildCheckoutUpiQuery({
+    payeeVpa: input.payeeUpi,
+    payeeName: input.payeeName,
+    amount: input.amount,
+    currency: input.currency,
+    note: input.note,
+    transactionId: input.transactionId?.trim() || createUpiTxnId(),
+  });
   const app = input.preferredApp ?? "generic";
+
+  if (isAndroid()) {
+    const pkgs: Partial<Record<UpiApp, string>> = {
+      gpay: "com.google.android.apps.nbu.paisa.user",
+      phonepe: "com.phonepe.app",
+      paytm: "net.one97.paytm",
+      whatsapp: "com.whatsapp",
+    };
+    if (app !== "generic" && pkgs[app]) {
+      return androidIntentPay(query, pkgs[app]);
+    }
+    if (app === "generic") return androidIntentPay(query);
+  }
 
   switch (app) {
     case "gpay":
-      // tez:// is widely used on both Android and iOS India.
-      return isAndroid() || isIOS() ? `tez://upi/pay?${query}` : `upi://pay?${query}`;
+      return isIOS() ? `gpay://upi/pay?${query}` : `tez://upi/pay?${query}`;
     case "phonepe":
-      return `phonepe://pay?${query}`;
+      return `phonepe://upi/pay?${query}`;
     case "paytm":
       return `paytmmp://pay?${query}`;
     case "supermoney":
-      return `upi://pay?${query}`;
     case "whatsapp":
     case "generic":
     default:

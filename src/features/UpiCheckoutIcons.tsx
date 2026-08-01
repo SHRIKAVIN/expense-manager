@@ -9,19 +9,23 @@ type Props = {
 
 /** App-icon deep-link checkout grid (iOS / PWA). */
 export function UpiCheckoutIcons({ disabled, phase, onSelect }: Props) {
-  const busy = phase === "creating" || phase === "launching" || phase === "verifying";
+  const busy =
+    phase === "preparing" ||
+    phase === "launching" ||
+    phase === "verifying" ||
+    phase === "awaiting_return";
 
   return (
     <div className="relative" data-testid="upi-checkout-icons">
-      {(busy || phase === "awaiting_return") && (
+      {busy && (
         <div
           className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-xl bg-canvas/80 backdrop-blur-[2px]"
           data-testid="upi-checkout-mask"
         >
           <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
           <p className="text-caption text-ink-muted-48 text-center px-4">
-            {phase === "creating"
-              ? "Registering payment…"
+            {phase === "preparing"
+              ? "Preparing payment…"
               : phase === "verifying"
                 ? "Confirming with bank…"
                 : "Opening UPI app…"}
@@ -55,7 +59,9 @@ export function UpiCheckoutIcons({ disabled, phase, onSelect }: Props) {
         ))}
       </div>
       <p className="text-caption text-ink-muted-48 mt-4 text-center">
-        Opens the app on your phone. If it isn&apos;t installed, you&apos;ll be sent to the App Store.
+        {phase === "ready"
+          ? "Tap an app to pay the exact amount."
+          : "Opens the app on your phone. If it isn't installed, you'll be sent to the App Store."}
       </p>
     </div>
   );

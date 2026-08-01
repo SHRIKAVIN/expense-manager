@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTrackedPayment, fetchPaymentStatus } from "./paymentTrackerApi";
-import type { PaymentStatusResponse, UpiPaymentStatus } from "./trackerTypes";
+import type { CreatePaymentResponse, PaymentStatusResponse, UpiPaymentStatus } from "./trackerTypes";
 import {
   buildIosCheckoutUri,
   getCheckoutApp,
@@ -10,14 +10,14 @@ import {
 import { assertPayeeVpa } from "./upiVpa";
 
 const APP_MISS_TIMEOUT_MS = 2500;
-/** Fast checks — without a real bank webhook, PENDING will never become PAID. */
-const STATUS_POLL_MS = 900;
-const STATUS_POLL_MAX = 5;
-const STATUS_DEADLINE_MS = 6000;
+const STATUS_POLL_MS = 1200;
+const STATUS_POLL_MAX = 6;
+const STATUS_DEADLINE_MS = 8000;
 
 export type CheckoutPhase =
   | "idle"
-  | "creating"
+  | "preparing"
+  | "ready"
   | "launching"
   | "awaiting_return"
   | "verifying"
@@ -31,9 +31,16 @@ type ActiveLaunch = {
   expenseIds: string[];
 };
 
+type PreparedPay = {
+  created: CreatePaymentResponse;
+  expenseIds: string[];
+};
+
 /**
- * iOS/PWA UPI checkout: register txn → deep link → App Store miss timeout →
- * one status poll cycle when returning from the UPI app (not on every focus).
+ * iOS/PWA UPI checkout:
+ * 1) prepareCheckout() registers PENDING txn (before icon tap)
+ * 2) payWithApp() launches deep link synchronously in the tap (keeps amount/VPA)
+ * 3) visibilitychange → status poll
  */
 export function useUpiVerifiedCheckout(opts: {
   onPaid: (result: PaymentStatusResponse, expenseIds: string[]) => void | Promise<void>;
@@ -43,11 +50,11 @@ export function useUpiVerifiedCheckout(opts: {
   const [status, setStatus] = useState<UpiPaymentStatus | null>(null);
   const [active, setActive] = useState<ActiveLaunch | null>(null);
   const activeRef = useRef<ActiveLaunch | null>(null);
+  const preparedRef = useRef<PreparedPay | null>(null);
   const missTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const verifyingRef = useRef(false);
   const inFlightRef = useRef(false);
-  /** After one verify cycle (paid/unpaid), ignore further resume events for this txn. */
   const verifyDoneForTxnRef = useRef<string | null>(null);
   const wasHiddenRef = useRef(false);
   const onPaidRef = useRef(opts.onPaid);
@@ -71,6 +78,7 @@ export function useUpiVerifiedCheckout(opts: {
     clearMissTimer();
     clearPoll();
     activeRef.current = null;
+    preparedRef.current = null;
     verifyDoneForTxnRef.current = null;
     wasHiddenRef.current = false;
     setActive(null);
@@ -153,7 +161,6 @@ export function useUpiVerifiedCheckout(opts: {
         return;
       }
 
-      // Only after a real background→foreground (return from UPI), not DevTools focus.
       if (
         document.visibilityState === "visible" &&
         wasHiddenRef.current &&
@@ -173,23 +180,22 @@ export function useUpiVerifiedCheckout(opts: {
     };
   }, [verifyLoop]);
 
-  const payWithApp = useCallback(
-    async (
-      app: UpiCheckoutApp,
-      input: {
-        expenseIds: string[];
-        amount: number;
-        currency?: string;
-        payeeVpa: string;
-        payeeName?: string;
-        note?: string;
-      },
-    ) => {
+  /** Register PENDING txn before the icon tap so launch stays synchronous. */
+  const prepareCheckout = useCallback(
+    async (input: {
+      expenseIds: string[];
+      amount: number;
+      currency?: string;
+      payeeVpa: string;
+      payeeName?: string;
+      note?: string;
+    }) => {
       clearMissTimer();
       clearPoll();
+      preparedRef.current = null;
       verifyDoneForTxnRef.current = null;
       wasHiddenRef.current = false;
-      setPhase("creating");
+      setPhase("preparing");
       setStatus(null);
 
       try {
@@ -205,47 +211,60 @@ export function useUpiVerifiedCheckout(opts: {
           payeeVpa,
           payeeName: input.payeeName,
           note: input.note,
-          preferredApp: app,
         });
 
-        const launch: ActiveLaunch = {
-          app,
-          transactionId: created.transactionId,
-          expenseIds: input.expenseIds,
-        };
-        activeRef.current = launch;
-        setActive(launch);
-        setPhase("launching");
-
-        const uri = buildIosCheckoutUri(app, {
-          payeeVpa: created.payeeVpa,
-          payeeName: created.payeeName,
-          amount: created.amount,
-          currency: created.currency,
-          note: created.note,
-          transactionId: created.transactionId,
-        });
-
-        missTimerRef.current = setTimeout(() => {
-          if (
-            document.visibilityState === "visible" &&
-            activeRef.current?.transactionId === created.transactionId &&
-            verifyDoneForTxnRef.current !== created.transactionId
-          ) {
-            // Never left the page — app likely missing.
-            window.location.href = getCheckoutApp(app).iosAppStoreUrl;
-          }
-        }, APP_MISS_TIMEOUT_MS);
-
-        setPhase("awaiting_return");
-        launchCheckoutUri(uri);
+        preparedRef.current = { created, expenseIds: input.expenseIds };
+        setPhase("ready");
+        return created;
       } catch (err) {
         setPhase("error");
         onErrorRef.current?.(err instanceof Error ? err.message : "Could not start payment");
+        throw err;
       }
     },
     [],
   );
+
+  /** Must stay sync after prepare — same tap gesture opens the UPI app with full params. */
+  const payWithApp = useCallback((app: UpiCheckoutApp) => {
+    const prepared = preparedRef.current;
+    if (!prepared) {
+      onErrorRef.current?.("Payment isn’t ready yet — go back and try again");
+      return;
+    }
+
+    const { created, expenseIds } = prepared;
+    const launch: ActiveLaunch = {
+      app,
+      transactionId: created.transactionId,
+      expenseIds,
+    };
+    activeRef.current = launch;
+    setActive(launch);
+    setPhase("launching");
+
+    const uri = buildIosCheckoutUri(app, {
+      payeeVpa: created.payeeVpa,
+      payeeName: created.payeeName,
+      amount: Number(created.amount),
+      currency: created.currency,
+      note: created.note,
+      transactionId: created.transactionId,
+    });
+
+    missTimerRef.current = setTimeout(() => {
+      if (
+        document.visibilityState === "visible" &&
+        activeRef.current?.transactionId === created.transactionId &&
+        verifyDoneForTxnRef.current !== created.transactionId
+      ) {
+        window.location.href = getCheckoutApp(app).iosAppStoreUrl;
+      }
+    }, APP_MISS_TIMEOUT_MS);
+
+    setPhase("awaiting_return");
+    launchCheckoutUri(uri);
+  }, []);
 
   const cancelVerify = useCallback(() => {
     const txn = activeRef.current?.transactionId;
@@ -259,9 +278,11 @@ export function useUpiVerifiedCheckout(opts: {
     phase,
     status,
     active,
+    prepareCheckout,
     payWithApp,
     reset,
     cancelVerify,
-    verifying: phase === "verifying" || phase === "creating",
+    verifying: phase === "verifying" || phase === "preparing",
+    ready: phase === "ready",
   };
 }

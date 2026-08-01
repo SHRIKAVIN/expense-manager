@@ -50,14 +50,22 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
 
   const partnerEmail = user?.email ? getReimbursementPartner(user.email)?.email : undefined;
 
-  const { phase, payWithApp, reset: resetCheckout, verifying } = useUpiVerifiedCheckout({
+  const {
+    phase,
+    prepareCheckout,
+    payWithApp,
+    reset: resetCheckout,
+    verifying,
+    ready,
+  } = useUpiVerifiedCheckout({
     onPaid: async (_result, expenseIds) => {
       if (!user || !partnerPay || settlingRef.current) return;
       const toSettle = reimbursementsToPay.filter((r) => expenseIds.includes(r.id));
       if (toSettle.length === 0) {
         await refresh();
         resetCheckout();
-        closePaySheet();
+        setPayTarget(null);
+        setPayStep("choose");
         show("Payment confirmed");
         return;
       }
@@ -87,7 +95,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
         const total = toSettle.reduce((s, r) => s + r.amount, 0);
         const name = toSettle[0]?.requesterName ?? "partner";
         resetCheckout();
-        closePaySheet();
+        setPayTarget(null);
+        setPayStep("choose");
         setCelebration({
           amountLabel: formatCurrency(total, currency),
           detail:
@@ -152,38 +161,42 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   };
 
   const goToUpiApps = () => {
-    if (!partnerPay?.upiId && !partnerPay?.phone) {
-      show("Ask them to add their UPI ID in Settings");
+    const target = payTargetRef.current;
+    if (!partnerPay || !target) return;
+    // Prefer real VPA — bare phone→@upi often fails in GPay/PhonePe.
+    const payeeVpa = partnerPay.upiId?.trim() || partnerPay.phone?.trim();
+    if (!payeeVpa) {
+      show("Ask them to add their UPI ID in Settings (e.g. name@oksbi)");
       return;
+    }
+    if (!partnerPay.upiId?.includes("@")) {
+      show("Use a full UPI ID in Settings (name@ybl), not only a phone number");
     }
     tapHaptic();
     setPayStep("upi");
-  };
-
-  const launchWithApp = (app: UpiCheckoutApp) => {
-    const target = payTargetRef.current;
-    if (!user || !partnerPay || !target) return;
-    const payeeVpa = partnerPay.upiId || partnerPay.phone;
-    if (!payeeVpa) {
-      show("Ask them to add their UPI ID in Settings");
-      return;
-    }
     const requests = target.mode === "all" ? target.requests : [target.req];
     const amount = requests.reduce((s, r) => s + r.amount, 0);
     const note =
       requests.length === 1
         ? `Settle ${requests[0]!.merchant}`
         : `Settle ${requests.length} reimbursements`;
-    const ids = requests.map((r) => r.id);
-    tapHaptic();
-    void payWithApp(app, {
-      expenseIds: ids,
+    void prepareCheckout({
+      expenseIds: requests.map((r) => r.id),
       amount,
       currency,
       payeeVpa,
       payeeName: partnerPay.displayName || requests[0]!.requesterName,
       note,
     });
+  };
+
+  const launchWithApp = (app: UpiCheckoutApp) => {
+    if (!ready) {
+      show("Still preparing payment…");
+      return;
+    }
+    tapHaptic();
+    payWithApp(app);
   };
 
   const recordSettlements = async (
@@ -412,7 +425,7 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
             </button>
             <UpiCheckoutIcons
               phase={phase}
-              disabled={Boolean(busyId)}
+              disabled={Boolean(busyId) || !ready}
               onSelect={launchWithApp}
             />
           </>

@@ -65,13 +65,31 @@ export async function createTrackedPayment(
 export async function fetchPaymentStatus(
   transactionId: string,
 ): Promise<PaymentStatusResponse> {
+  // Prefer direct PostgREST (RLS) — Edge Function cold starts are 2–4s+.
+  if (isSupabaseEnabled() && !import.meta.env.VITE_PAYMENTS_API_BASE) {
+    const { data, error } = await getSupabase()
+      .from("upi_payment_transactions")
+      .select("transaction_id, expense_id, amount, currency, status, paid_at, updated_at")
+      .eq("transaction_id", transactionId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) throw new Error("Payment not found");
+    return {
+      transactionId: data.transaction_id as string,
+      expenseId: data.expense_id as string,
+      amount: Number(data.amount),
+      currency: data.currency as string,
+      status: data.status as PaymentStatusResponse["status"],
+      paidAt: (data.paid_at as string | null) ?? null,
+      updatedAt: data.updated_at as string,
+    };
+  }
+
   const base = paymentsApiBase();
   if (!base) throw new Error("Payments API is not configured.");
 
   const headers = await authHeader();
-  const url = base.includes("/functions/v1")
-    ? `${base}/payments-status?transactionId=${encodeURIComponent(transactionId)}`
-    : `${base}/api/v1/payments/status/${encodeURIComponent(transactionId)}`;
+  const url = `${base}/api/v1/payments/status/${encodeURIComponent(transactionId)}`;
 
   const res = await fetch(url, { method: "GET", headers });
   if (!res.ok) {
