@@ -170,7 +170,7 @@ export async function notifyPartnerReimbursementRejected(
   });
 }
 
-/** Nudge the payer to settle via UPI (Request Payment). */
+/** Nudge the payer to settle an unpaid reimbursement. */
 export async function notifyPartnerPaymentRequested(
   user: SessionUser,
   req: ReimbursementRequest,

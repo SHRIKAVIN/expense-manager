@@ -45,7 +45,6 @@ import {
 } from "@/lib/icons";
 import { formatCurrency, formatDateTime, relativeDue } from "@/lib/format";
 import { exportExpensesPdf } from "@/lib/exportPdf";
-import { isValidUpiId, normalizeUpiId } from "@/payments/upi";
 import { clearSettlementHistory, listSettlements } from "@/payments/settlementsApi";
 import type { Category, Recurring, Settlement } from "@/lib/types";
 
@@ -69,19 +68,11 @@ export function SettingsScreen() {
 
   const currency = user?.currency ?? "INR";
   const savedName = user?.displayName ?? "";
-  const savedUpi = user?.upiId ?? "";
-  const savedPhone = user?.phone ?? "";
   const [name, setName] = useState(savedName);
-  const [upiId, setUpiId] = useState(savedUpi);
-  const [phone, setPhone] = useState(savedPhone);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [settlementsLoading, setSettlementsLoading] = useState(false);
   const nameDirty = name.trim() !== savedName.trim();
-  const upiDirty = normalizeUpiId(upiId) !== normalizeUpiId(savedUpi);
-  const phoneDirty = phone.trim() !== savedPhone.trim();
-  const paymentsDirty = upiDirty || phoneDirty;
   const canSaveName = nameDirty && name.trim().length > 0 && !isQuickSwitchViewOnly;
-  const canSavePayments = paymentsDirty && !isQuickSwitchViewOnly;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
@@ -151,11 +142,6 @@ export function SettingsScreen() {
   }, [user?.displayName]);
 
   useEffect(() => {
-    setUpiId(user?.upiId ?? "");
-    setPhone(user?.phone ?? "");
-  }, [user?.upiId, user?.phone]);
-
-  useEffect(() => {
     if (!user?.id || !hasPartner) {
       setSettlements([]);
       setSettlementsLoading(false);
@@ -183,23 +169,6 @@ export function SettingsScreen() {
   const saveName = async () => {
     await updateProfile({ displayName: name.trim() || user?.displayName || "" });
     show("Profile updated");
-  };
-
-  const savePayments = async () => {
-    const trimmed = upiId.trim();
-    if (trimmed && !isValidUpiId(trimmed)) {
-      show("Invalid UPI ID. Use a format like name@oksbi");
-      return;
-    }
-    try {
-      await updateProfile({
-        upiId: trimmed ? normalizeUpiId(trimmed) : "",
-        phone: phone.trim(),
-      });
-      show("Payment details saved");
-    } catch (err) {
-      show(err instanceof Error ? err.message : "Could not save payment details");
-    }
   };
 
   const clearSettlements = async () => {
@@ -384,42 +353,6 @@ export function SettingsScreen() {
           </Card>
         </Section>
 
-        {/* Settle Up / UPI — only when a reimbursement partner exists */}
-        {hasPartner && (
-          <Section title="Settle Up">
-            <Card className="flex flex-col gap-5" data-testid="settings-settle-up">
-              <TextField
-                label="UPI ID"
-                value={upiId}
-                onChange={(e) => setUpiId(e.target.value)}
-                placeholder="name@oksbi"
-                disabled={isQuickSwitchViewOnly}
-                data-testid="settings-upi-id"
-              />
-              <TextField
-                label="Phone (optional)"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="For partner reference"
-                disabled={isQuickSwitchViewOnly}
-                data-testid="settings-phone"
-              />
-              <p className="text-caption text-ink-muted-48 -mt-2">
-                Your partner uses this UPI ID when they tap Pay Now. Add yours so they can settle
-                quickly.
-              </p>
-              <Button
-                variant="primary"
-                onClick={() => void savePayments()}
-                disabled={!canSavePayments}
-                data-testid="settings-save-payments"
-              >
-                Save payment details
-              </Button>
-            </Card>
-          </Section>
-        )}
-
         {/* Settlement history */}
         {hasPartner && (
           <Section title="Settlement history">
@@ -429,7 +362,7 @@ export function SettingsScreen() {
               )}
               {!settlementsLoading && settlements.length === 0 && (
                 <p className="px-5 py-4 text-body text-ink-muted-48">
-                  No settlements yet. Pay Now from a reimbursement creates a history entry.
+                  No settlements yet. Pay from a reimbursement creates a history entry.
                 </p>
               )}
               {settlements.map((s) => {
@@ -452,7 +385,6 @@ export function SettingsScreen() {
                     <p className="text-caption text-ink-muted-48">
                       {[
                         s.merchant,
-                        s.method.toUpperCase(),
                         formatDateTime(s.settledAt ?? s.createdAt),
                         s.note,
                       ]

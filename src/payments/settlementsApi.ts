@@ -57,7 +57,7 @@ export async function createSettlement(input: {
       payee_name: input.payeeName,
       merchant: input.merchant ?? null,
       amount: input.amount,
-      method: input.method ?? "upi",
+      method: input.method ?? "other",
       note: input.note?.trim() || null,
       status,
       settled_at: status === "payer_confirmed" ? now : null,
