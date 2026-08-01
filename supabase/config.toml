@@ -1,2 +1,13 @@
 [functions.send-partner-push]
 verify_jwt = false
+
+# Authenticated inside the function via user JWT.
+[functions.payments-create]
+verify_jwt = false
+
+[functions.payments-status]
+verify_jwt = false
+
+# Bank webhook uses x-bank-webhook-secret — not end-user JWT.
+[functions.bank-callbacks-upi-receiver]
+verify_jwt = false

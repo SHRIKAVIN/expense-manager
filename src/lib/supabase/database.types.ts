@@ -104,3 +104,21 @@ export interface DbSettlement {
   created_at: string;
   settled_at: string | null;
 }
+
+export interface DbUpiPaymentTransaction {
+  id: string;
+  transaction_id: string;
+  expense_id: string;
+  related_expense_ids: string[];
+  payer_id: string;
+  payee_vpa: string;
+  amount: number;
+  currency: string;
+  preferred_app: string | null;
+  note: string | null;
+  status: "PENDING" | "PAID" | "FAILED" | "EXPIRED";
+  bank_reference: string | null;
+  created_at: string;
+  updated_at: string;
+  paid_at: string | null;
+}

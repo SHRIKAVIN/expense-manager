@@ -60,7 +60,7 @@ function buildUpiQuery(input: CreatePaymentInput): string {
  * - GPay iOS: gpay://upi/pay
  * - PhonePe: phonepe://pay
  * - Paytm: paytmmp://pay
- * - WhatsApp / Other: upi://pay
+ * - SuperMoney / WhatsApp / Other: upi://pay
  */
 export function buildUpiPayUri(input: CreatePaymentInput): string {
   const query = buildUpiQuery(input);
@@ -68,13 +68,14 @@ export function buildUpiPayUri(input: CreatePaymentInput): string {
 
   switch (app) {
     case "gpay":
-      if (isIOS()) return `gpay://upi/pay?${query}`;
-      if (isAndroid()) return `tez://upi/pay?${query}`;
-      return `upi://pay?${query}`;
+      // tez:// is widely used on both Android and iOS India.
+      return isAndroid() || isIOS() ? `tez://upi/pay?${query}` : `upi://pay?${query}`;
     case "phonepe":
       return `phonepe://pay?${query}`;
     case "paytm":
       return `paytmmp://pay?${query}`;
+    case "supermoney":
+      return `upi://pay?${query}`;
     case "whatsapp":
     case "generic":
     default:
