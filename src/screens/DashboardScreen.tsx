@@ -16,6 +16,7 @@ import { MonthPicker } from "@/components/MonthPicker";
 import { CategoryDonut } from "@/features/CategoryDonut";
 import { ReimbursementsOwedCard } from "@/features/ReimbursementsOwedCard";
 import { ReimbursementsConfirmCard } from "@/features/ReimbursementsConfirmCard";
+import { ReimbursementsCollectCard } from "@/features/ReimbursementsCollectCard";
 import {
   DashboardSummarySheet,
   type DashboardSummaryKind,
@@ -220,6 +221,7 @@ export function DashboardScreen() {
       </div>
 
       <ReimbursementsOwedCard currency={currency} />
+      <ReimbursementsCollectCard currency={currency} />
       <ReimbursementsConfirmCard currency={currency} />
 
       {/* Upcoming recurring */}

@@ -43,9 +43,11 @@ import {
   RepeatIcon,
   TrashIcon,
 } from "@/lib/icons";
-import { formatCurrency, relativeDue } from "@/lib/format";
+import { formatCurrency, formatDateTime, relativeDue } from "@/lib/format";
 import { exportExpensesPdf } from "@/lib/exportPdf";
-import type { Category, Recurring } from "@/lib/types";
+import { isValidUpiId, normalizeUpiId } from "@/payments/upi";
+import { listSettlements } from "@/payments/settlementsApi";
+import type { Category, Recurring, Settlement } from "@/lib/types";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -67,9 +69,19 @@ export function SettingsScreen() {
 
   const currency = user?.currency ?? "INR";
   const savedName = user?.displayName ?? "";
+  const savedUpi = user?.upiId ?? "";
+  const savedPhone = user?.phone ?? "";
   const [name, setName] = useState(savedName);
+  const [upiId, setUpiId] = useState(savedUpi);
+  const [phone, setPhone] = useState(savedPhone);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settlementsLoading, setSettlementsLoading] = useState(false);
   const nameDirty = name.trim() !== savedName.trim();
+  const upiDirty = normalizeUpiId(upiId) !== normalizeUpiId(savedUpi);
+  const phoneDirty = phone.trim() !== savedPhone.trim();
+  const paymentsDirty = upiDirty || phoneDirty;
   const canSaveName = nameDirty && name.trim().length > 0 && !isQuickSwitchViewOnly;
+  const canSavePayments = paymentsDirty && !isQuickSwitchViewOnly;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
@@ -135,11 +147,52 @@ export function SettingsScreen() {
     setName(user?.displayName ?? "");
   }, [user?.displayName]);
 
+  useEffect(() => {
+    setUpiId(user?.upiId ?? "");
+    setPhone(user?.phone ?? "");
+  }, [user?.upiId, user?.phone]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    setSettlementsLoading(true);
+    void listSettlements()
+      .then((rows) => {
+        if (!cancelled) setSettlements(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setSettlements([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSettlementsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const activeCategories = categories.filter((c) => !c.archived);
 
   const saveName = async () => {
     await updateProfile({ displayName: name.trim() || user?.displayName || "" });
     show("Profile updated");
+  };
+
+  const savePayments = async () => {
+    const trimmed = upiId.trim();
+    if (trimmed && !isValidUpiId(trimmed)) {
+      show("Invalid UPI ID. Use a format like name@oksbi");
+      return;
+    }
+    try {
+      await updateProfile({
+        upiId: trimmed ? normalizeUpiId(trimmed) : "",
+        phone: phone.trim(),
+      });
+      show("Payment details saved");
+    } catch (err) {
+      show(err instanceof Error ? err.message : "Could not save payment details");
+    }
   };
 
   const toggleReminders = async () => {
@@ -306,6 +359,84 @@ export function SettingsScreen() {
                 <LogoutIcon size={18} /> Sign out
               </Button>
             </div>
+          </Card>
+        </Section>
+
+        {/* Settle Up / UPI */}
+        <Section title="Settle Up">
+          <Card className="flex flex-col gap-5" data-testid="settings-settle-up">
+            <TextField
+              label="UPI ID"
+              value={upiId}
+              onChange={(e) => setUpiId(e.target.value)}
+              placeholder="name@oksbi"
+              disabled={isQuickSwitchViewOnly}
+              data-testid="settings-upi-id"
+            />
+            <TextField
+              label="Phone (optional)"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="For partner reference"
+              disabled={isQuickSwitchViewOnly}
+              data-testid="settings-phone"
+            />
+            <p className="text-caption text-ink-muted-48 -mt-2">
+              Your partner uses this UPI ID when they tap Pay Now. Add yours so they can settle
+              quickly.
+            </p>
+            <Button
+              variant="primary"
+              onClick={() => void savePayments()}
+              disabled={!canSavePayments}
+              data-testid="settings-save-payments"
+            >
+              Save payment details
+            </Button>
+          </Card>
+        </Section>
+
+        {/* Settlement history */}
+        <Section title="Settlement history">
+          <Card padded={false} className="overflow-hidden" data-testid="settings-settlement-history">
+            {settlementsLoading && (
+              <p className="px-5 py-4 text-body text-ink-muted-48">Loading…</p>
+            )}
+            {!settlementsLoading && settlements.length === 0 && (
+              <p className="px-5 py-4 text-body text-ink-muted-48">
+                No settlements yet. Pay Now from a reimbursement creates a history entry.
+              </p>
+            )}
+            {settlements.map((s) => {
+              const iPaid = s.payerId === user?.id;
+              const partnerLabel = iPaid ? s.payeeName || "Partner" : s.payerName || "Partner";
+              return (
+                <div
+                  key={s.id}
+                  className="flex flex-col gap-0.5 px-5 py-3 border-b border-divider-soft last:border-b-0"
+                  data-testid={`settlement-row-${s.id}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-body text-ink truncate">
+                      {iPaid ? `Paid ${partnerLabel}` : `Received from ${partnerLabel}`}
+                    </p>
+                    <p className="text-body-strong text-ink shrink-0">
+                      {formatCurrency(s.amount, currency)}
+                    </p>
+                  </div>
+                  <p className="text-caption text-ink-muted-48">
+                    {[
+                      s.merchant,
+                      s.method.toUpperCase(),
+                      formatDateTime(s.settledAt ?? s.createdAt),
+                      s.note,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+              );
+            })}
           </Card>
         </Section>
 

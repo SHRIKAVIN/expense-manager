@@ -6,6 +6,7 @@ import type {
   ReimbursementRequest,
   Recurring,
   SessionUser,
+  Settlement,
   ThemePreference,
 } from "@/lib/types";
 import type {
@@ -16,6 +17,7 @@ import type {
   DbReimbursementRequest,
   DbReceipt,
   DbRecurring,
+  DbSettlement,
 } from "@/lib/supabase/database.types";
 
 export function profileToSession(row: DbProfile): SessionUser {
@@ -27,6 +29,8 @@ export function profileToSession(row: DbProfile): SessionUser {
     currency: row.currency,
     themePreference: row.theme_preference as ThemePreference,
     gender: row.gender === "male" || row.gender === "female" ? row.gender : undefined,
+    upiId: row.upi_id?.trim() || undefined,
+    phone: row.phone?.trim() || undefined,
     createdAt: new Date(row.created_at).getTime(),
   };
 }
@@ -112,5 +116,23 @@ export function toReimbursement(row: DbReimbursementRequest): ReimbursementReque
     createdAt: new Date(row.created_at).getTime(),
     completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
     payerExpenseId: row.payer_expense_id ?? undefined,
+  };
+}
+
+export function toSettlement(row: DbSettlement): Settlement {
+  return {
+    id: row.id,
+    reimbursementRequestId: row.reimbursement_request_id,
+    payerId: row.payer_id,
+    payeeId: row.payee_id,
+    amount: Number(row.amount),
+    method: row.method,
+    note: row.note ?? undefined,
+    status: row.status,
+    createdAt: new Date(row.created_at).getTime(),
+    settledAt: row.settled_at ? new Date(row.settled_at).getTime() : undefined,
+    payerName: row.payer_name || undefined,
+    payeeName: row.payee_name || undefined,
+    merchant: row.merchant ?? undefined,
   };
 }

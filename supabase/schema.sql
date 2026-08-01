@@ -9,6 +9,8 @@ create table if not exists public.profiles (
   currency text not null default 'INR',
   theme_preference text not null default 'system' check (theme_preference in ('light', 'dark', 'system')),
   gender text check (gender is null or gender in ('male', 'female')),
+  upi_id text,
+  phone text,
   created_at timestamptz not null default now()
 );
 
@@ -505,3 +507,64 @@ create policy "push_subscriptions_delete_own" on public.push_subscriptions for d
   auth.uid() = user_id
 );
 create policy "recurring_all_own" on public.recurring for all using (auth.uid() = user_id);
+
+-- Settle Up
+create table if not exists public.settlements (
+  id uuid primary key default gen_random_uuid(),
+  reimbursement_request_id uuid not null references public.reimbursement_requests (id) on delete cascade,
+  payer_id uuid not null references public.profiles (id) on delete cascade,
+  payee_id uuid not null references public.profiles (id) on delete cascade,
+  payer_name text not null default '',
+  payee_name text not null default '',
+  merchant text,
+  amount numeric(12, 2) not null check (amount > 0),
+  method text not null default 'upi' check (method in ('upi', 'cash', 'other')),
+  note text,
+  status text not null default 'initiated'
+    check (status in ('initiated', 'payer_confirmed', 'cancelled')),
+  created_at timestamptz not null default now(),
+  settled_at timestamptz
+);
+alter table public.settlements enable row level security;
+create policy "settlements_select_participant" on public.settlements for select
+  using (auth.uid() = payer_id or auth.uid() = payee_id);
+create policy "settlements_insert_payer" on public.settlements for insert
+  with check (auth.uid() = payer_id);
+create policy "settlements_update_participant" on public.settlements for update
+  using (auth.uid() = payer_id or auth.uid() = payee_id);
+
+create or replace function public.get_partner_payment_info(partner_email text)
+returns table (
+  id uuid,
+  email text,
+  display_name text,
+  upi_id text,
+  phone text
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  me_email text;
+  normalized text := lower(trim(partner_email));
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select lower(p.email) into me_email from public.profiles p where p.id = auth.uid();
+  if me_email is null then
+    raise exception 'Profile not found';
+  end if;
+
+  return query
+    select p.id, p.email, p.display_name, p.upi_id, p.phone
+    from public.profiles p
+    where lower(p.email) = normalized
+    limit 1;
+end;
+$$;
+
+grant execute on function public.get_partner_payment_info(text) to authenticated;
+

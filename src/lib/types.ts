@@ -14,6 +14,9 @@ export interface User {
   currency: string;
   themePreference: ThemePreference;
   gender?: Gender;
+  /** UPI VPA for Settle Up (own ID). */
+  upiId?: string;
+  phone?: string;
   createdAt: number;
 }
 
@@ -122,6 +125,26 @@ export interface ReimbursementRequest {
   completedAt?: number;
   /** Expense id on the payer's account after confirmation. */
   payerExpenseId?: string;
+}
+
+export type SettlementMethod = "upi" | "cash" | "other";
+export type SettlementStatus = "initiated" | "payer_confirmed" | "cancelled";
+
+export interface Settlement {
+  id: string;
+  reimbursementRequestId: string;
+  payerId: string;
+  payeeId: string;
+  amount: number;
+  method: SettlementMethod;
+  note?: string;
+  status: SettlementStatus;
+  createdAt: number;
+  settledAt?: number;
+  /** Denormalized for UI when joined. */
+  payerName?: string;
+  payeeName?: string;
+  merchant?: string;
 }
 
 /** Monthly income entry — multiple rows per month are summed on the dashboard. */

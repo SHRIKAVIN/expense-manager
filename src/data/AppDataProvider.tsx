@@ -57,6 +57,8 @@ interface AppDataContextValue {
   reimbursementsToConfirm: ReimbursementRequest[];
   /** Pending reimbursements the current user must pay back. */
   reimbursementsToPay: ReimbursementRequest[];
+  /** Pending reimbursements others owe the current user (awaiting their payment). */
+  reimbursementsAwaitingCollection: ReimbursementRequest[];
   recurring: Recurring[];
   categoriesById: Record<string, Category>;
   /** Count of expense writes waiting to sync while offline. */
@@ -491,6 +493,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [activeReimbursements, requesterExpenseIds, user.id],
   );
 
+  const reimbursementsAwaitingCollection = useMemo(
+    () =>
+      activeReimbursements.filter(
+        (r) =>
+          r.status === "pending" &&
+          r.requesterId === user.id &&
+          requesterExpenseIds.has(r.expenseId),
+      ),
+    [activeReimbursements, requesterExpenseIds, user.id],
+  );
+
   const can = useMemo(
     () => ({
       writeExpenses: RolePolicy.canWriteExpenses(effectiveRole),
@@ -513,6 +526,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       reimbursementByExpenseId,
       reimbursementsToConfirm,
       reimbursementsToPay,
+      reimbursementsAwaitingCollection,
       recurring,
       categoriesById,
       pendingSyncCount,
@@ -545,6 +559,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       reimbursementByExpenseId,
       reimbursementsToConfirm,
       reimbursementsToPay,
+      reimbursementsAwaitingCollection,
       recurring,
       categoriesById,
       pendingSyncCount,

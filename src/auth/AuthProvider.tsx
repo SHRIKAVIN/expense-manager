@@ -47,7 +47,9 @@ interface AuthContextValue {
   signup: (input: SignupInput) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (patch: Partial<Pick<User, "displayName" | "currency">>) => Promise<void>;
+  updateProfile: (
+    patch: Partial<Pick<User, "displayName" | "currency" | "upiId" | "phone">>,
+  ) => Promise<void>;
   setThemePreference: (pref: ThemePreference) => Promise<void>;
   quickSwitchUsers: readonly QuickSwitchAccount[];
   canQuickSwitch: boolean;
@@ -225,14 +227,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const updateProfile = useCallback(
-    async (patch: Partial<Pick<User, "displayName" | "currency">>) => {
+    async (patch: Partial<Pick<User, "displayName" | "currency" | "upiId" | "phone">>) => {
       if (!user || !isSupabaseEnabled()) return;
       if (isQuickSwitchViewOnly(user.email)) {
         throw new Error("View only.");
       }
-      const updates: Record<string, string> = {};
+      const updates: Record<string, string | null> = {};
       if (patch.displayName !== undefined) updates.display_name = patch.displayName.trim();
       if (patch.currency !== undefined) updates.currency = patch.currency;
+      if (patch.upiId !== undefined) {
+        const v = patch.upiId.trim().toLowerCase();
+        updates.upi_id = v || null;
+      }
+      if (patch.phone !== undefined) {
+        const v = patch.phone.trim();
+        updates.phone = v || null;
+      }
 
       const { data, error } = await getSupabase()
         .from("profiles")

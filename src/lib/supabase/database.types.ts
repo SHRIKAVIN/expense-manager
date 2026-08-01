@@ -10,6 +10,8 @@ export interface DbProfile {
   currency: string;
   theme_preference: DbThemePreference;
   gender: "male" | "female" | null;
+  upi_id: string | null;
+  phone: string | null;
   recurring_reminders_enabled: boolean;
   partner_alerts_enabled: boolean;
   created_at: string;
@@ -85,4 +87,20 @@ export interface DbReimbursementRequest {
   created_at: string;
   completed_at: string | null;
   payer_expense_id: string | null;
+}
+
+export interface DbSettlement {
+  id: string;
+  reimbursement_request_id: string;
+  payer_id: string;
+  payee_id: string;
+  payer_name: string;
+  payee_name: string;
+  merchant: string | null;
+  amount: number;
+  method: "upi" | "cash" | "other";
+  note: string | null;
+  status: "initiated" | "payer_confirmed" | "cancelled";
+  created_at: string;
+  settled_at: string | null;
 }

@@ -11,6 +11,7 @@ export type PartnerNotificationKind =
   | "reimbursement_marked_paid"
   | "reimbursement_confirmed"
   | "reimbursement_rejected"
+  | "payment_requested"
   | "budget_alert";
 
 const PARTNER_ALERTS_KEY = "em.partnerAlerts";
@@ -166,6 +167,25 @@ export async function notifyPartnerReimbursementRejected(
     title: `${name} has not received payment yet`,
     body: `${amount} for ${req.merchant} — please pay again when ready`,
     kind: "reimbursement_rejected",
+  });
+}
+
+/** Nudge the payer to settle via UPI (Request Payment). */
+export async function notifyPartnerPaymentRequested(
+  user: SessionUser,
+  req: ReimbursementRequest,
+) {
+  const partner = partnerFor(user);
+  if (!partner || req.requesterId !== user.id) return;
+  const name = actorName(user);
+  const amount = formatCurrency(req.amount, user.currency);
+
+  await sendPartnerNotification({
+    recipientEmail: partner.email,
+    actorName: name,
+    title: `${name} requested payment`,
+    body: `${amount} for ${req.merchant} — open the app to Pay Now`,
+    kind: "payment_requested",
   });
 }
 
