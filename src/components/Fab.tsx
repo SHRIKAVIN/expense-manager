@@ -2,10 +2,12 @@ import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLottie } from "lottie-react";
 import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
+import type { SheetOrigin } from "@/components/Sheet";
 import fabAddAnimation from "@/assets/lottie/fab-add.json";
 
 interface FabProps {
-  onClick: () => void;
+  /** Receives the button's viewport centre so the sheet can zoom out of it. */
+  onClick: (origin: SheetOrigin) => void;
   label?: string;
   "data-testid"?: string;
 }
@@ -46,7 +48,10 @@ export function Fab({
   return (
     <motion.button
       type="button"
-      onClick={onClick}
+      onClick={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        onClick({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
+      }}
       aria-label={label}
       data-testid={testId}
       whileTap={reduced ? undefined : pressProps.whileTap}

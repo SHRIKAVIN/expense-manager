@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
-import { sheetSmooth, backdropSmooth, modalSmooth, usePrefersReducedMotion } from "@/lib/motion";
+import {
+  sheetSmooth,
+  backdropSmooth,
+  modalSmooth,
+  overlayEase,
+  zoomSpring,
+  usePrefersReducedMotion,
+} from "@/lib/motion";
 import { useIsDesktop } from "@/lib/useMediaQuery";
 import { useVisualViewportOverlay } from "@/lib/useVisualViewportOverlay";
 import { Button } from "./Button";
 import { CloseIcon } from "@/lib/icons";
+
+/** Viewport point the sheet should appear to grow out of. */
+export interface SheetOrigin {
+  x: number;
+  y: number;
+}
 
 interface SheetProps {
   open: boolean;
@@ -14,6 +27,11 @@ interface SheetProps {
   children: ReactNode;
   /** Optional sticky footer (e.g., primary action). */
   footer?: ReactNode;
+  /**
+   * When set, the mobile sheet zooms out of this viewport point instead of
+   * sliding up — the way an iOS app opens from its home screen icon.
+   */
+  origin?: SheetOrigin | null;
 }
 
 /**
@@ -22,16 +40,26 @@ interface SheetProps {
  * On iOS the overlay is pinned to the visual viewport so the sheet stays at the
  * true bottom when the software keyboard opens.
  */
-export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
+export function Sheet({ open, onClose, title, children, footer, origin }: SheetProps) {
   const isDesktop = useIsDesktop();
   const reduced = usePrefersReducedMotion();
   const overlayRef = useRef<HTMLDivElement>(null);
   /** Keep viewport pinning until the exit animation finishes. */
   const [mounted, setMounted] = useState(open);
+  /** Frozen at open time so the zoom still reverses correctly on close. */
+  const zoomOrigin = useRef<string | null>(null);
 
   useEffect(() => {
     if (open) setMounted(true);
   }, [open]);
+
+  if (open && origin && !isDesktop && !reduced && zoomOrigin.current === null) {
+    // The panel is bottom-anchored and full width, so the origin can be pinned to
+    // its own box without knowing how tall the sheet will end up being.
+    const x = (origin.x / window.innerWidth) * 100;
+    zoomOrigin.current = `${x}% calc(100% - ${Math.round(window.innerHeight - origin.y)}px)`;
+  }
+  const zooming = Boolean(zoomOrigin.current);
 
   useVisualViewportOverlay(overlayRef, mounted && !isDesktop);
 
@@ -46,14 +74,21 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
 
   const panelTransition = reduced
     ? { duration: 0 }
-    : isDesktop
-      ? modalSmooth
-      : sheetSmooth;
+    : zooming
+      ? { ...zoomSpring, opacity: { duration: 0.22, ease: overlayEase } }
+      : isDesktop
+        ? modalSmooth
+        : sheetSmooth;
 
   const backdropTransition = reduced ? { duration: 0 } : backdropSmooth;
 
   const content = (
-    <AnimatePresence onExitComplete={() => setMounted(false)}>
+    <AnimatePresence
+      onExitComplete={() => {
+        setMounted(false);
+        zoomOrigin.current = null;
+      }}
+    >
       {open && (
         <motion.div
           key="sheet-root"
@@ -77,20 +112,27 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
             aria-label={title}
             data-testid="sheet-panel"
             className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[min(92dvh,100%)] flex flex-col shrink-0 will-change-transform"
+            style={zoomOrigin.current ? { transformOrigin: zoomOrigin.current } : undefined}
             initial={
-              isDesktop
-                ? { opacity: 0, scale: 0.98, y: 16 }
-                : { y: "100%" }
+              zooming
+                ? { opacity: 0, scale: 0.24 }
+                : isDesktop
+                  ? { opacity: 0, scale: 0.98, y: 16 }
+                  : { y: "100%" }
             }
             animate={
-              isDesktop
-                ? { opacity: 1, scale: 1, y: 0 }
-                : { y: 0 }
+              zooming
+                ? { opacity: 1, scale: 1 }
+                : isDesktop
+                  ? { opacity: 1, scale: 1, y: 0 }
+                  : { y: 0 }
             }
             exit={
-              isDesktop
-                ? { opacity: 0, scale: 0.98, y: 16 }
-                : { y: "100%" }
+              zooming
+                ? { opacity: 0, scale: 0.24 }
+                : isDesktop
+                  ? { opacity: 0, scale: 0.98, y: 16 }
+                  : { y: "100%" }
             }
             transition={panelTransition}
           >

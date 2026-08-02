@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, type SheetOrigin } from "@/components/Sheet";
 import { Button } from "@/components/Button";
 import { TextField } from "@/components/TextField";
 import { useAppData } from "@/data/AppDataProvider";
@@ -10,9 +10,10 @@ interface IncomeSheetProps {
   open: boolean;
   onClose: () => void;
   defaultMonth?: string;
+  origin?: SheetOrigin | null;
 }
 
-export function IncomeSheet({ open, onClose, defaultMonth }: IncomeSheetProps) {
+export function IncomeSheet({ open, onClose, defaultMonth, origin }: IncomeSheetProps) {
   const { addIncome } = useAppData();
   const { show } = useToast();
   const [amount, setAmount] = useState("");
@@ -52,6 +53,7 @@ export function IncomeSheet({ open, onClose, defaultMonth }: IncomeSheetProps) {
     <Sheet
       open={open}
       onClose={onClose}
+      origin={origin}
       title="Add income"
       footer={
         <Button

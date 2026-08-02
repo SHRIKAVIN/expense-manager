@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/cn";
 import { HomeIcon } from "@/lib/icons";
 import { Fab } from "@/components/Fab";
+import type { SheetOrigin } from "@/components/Sheet";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
 import { IncomeSheet } from "@/features/IncomeSheet";
 import { useAppData } from "@/data/AppDataProvider";
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const reduced = usePrefersReducedMotion();
   const [addOpen, setAddOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  const [fabOrigin, setFabOrigin] = useState<SheetOrigin | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const scrollRef = useRef<HTMLElement>(null);
   const viewOnlyToastFor = useRef<string | null>(null);
@@ -152,10 +154,20 @@ export function AppShell({ children }: { children: ReactNode }) {
             </motion.div>
           </main>
 
-          {showExpenseFab && <Fab onClick={() => setAddOpen(true)} />}
+          {showExpenseFab && (
+            <Fab
+              onClick={(origin) => {
+                setFabOrigin(origin);
+                setAddOpen(true);
+              }}
+            />
+          )}
           {showIncomeFab && (
             <Fab
-              onClick={() => setIncomeOpen(true)}
+              onClick={(origin) => {
+                setFabOrigin(origin);
+                setIncomeOpen(true);
+              }}
               label="Add income"
               data-testid="fab-add-income"
             />
@@ -163,11 +175,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <ExpenseSheet open={addOpen} onClose={() => setAddOpen(false)} />
+      <ExpenseSheet open={addOpen} onClose={() => setAddOpen(false)} origin={fabOrigin} />
       <IncomeSheet
         open={incomeOpen}
         onClose={() => setIncomeOpen(false)}
         defaultMonth={getIncomeSelectedMonth()}
+        origin={fabOrigin}
       />
     </ScrolledContext.Provider>
   );

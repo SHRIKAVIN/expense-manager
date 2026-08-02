@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sheet } from "@/components/Sheet";
+import { Sheet, type SheetOrigin } from "@/components/Sheet";
 import { Button } from "@/components/Button";
 import { TextField, TextArea } from "@/components/TextField";
 import { Chip } from "@/components/Chip";
@@ -21,9 +21,11 @@ interface ExpenseSheetProps {
   onClose: () => void;
   /** When provided, the sheet is in edit mode. */
   editing?: Expense | null;
+  /** Viewport point to zoom out of, e.g. the FAB that opened this sheet. */
+  origin?: SheetOrigin | null;
 }
 
-export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
+export function ExpenseSheet({ open, onClose, editing, origin }: ExpenseSheetProps) {
   const { categories, expenses, addExpense, editExpense, repo, reimbursementByExpenseId } = useAppData();
   const { user } = useAuth();
   const { show } = useToast();
@@ -274,6 +276,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
     <Sheet
       open={open}
       onClose={onClose}
+      origin={origin}
       title={editing ? "Edit expense" : "Add expense"}
       footer={
         <Button

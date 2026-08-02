@@ -65,6 +65,15 @@ export const modalSmooth: Transition = {
   ease: overlayEase,
 };
 
+/** Springy zoom used when a surface grows out of the control that opened it. */
+export const zoomSpring: Transition = {
+  type: "spring",
+  stiffness: 380,
+  damping: 36,
+  mass: 0.85,
+  restDelta: 0.001,
+};
+
 export const backdropVariants: Variants = {
   hidden: { opacity: 0, transition: backdropSmooth },
   visible: { opacity: 0.4, transition: backdropSmooth },
