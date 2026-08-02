@@ -5,6 +5,7 @@ import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { useAppData } from "@/data/AppDataProvider";
 import { useToast } from "@/components/Toast";
 import { formatCurrency } from "@/lib/format";
+import { playSound } from "@/lib/sounds";
 
 export function ReimbursementsConfirmCard({ currency }: { currency: string }) {
   const { reimbursementsToConfirm, confirmReimbursement, rejectReimbursementPaid, can } =
@@ -32,6 +33,7 @@ export function ReimbursementsConfirmCard({ currency }: { currency: string }) {
   const handleReject = async (id: string, payerName: string) => {
     try {
       await rejectReimbursementPaid(id);
+      playSound("whoosh");
       show(`${payerName} will be asked to pay again`);
     } catch (err) {
       show(err instanceof Error ? err.message : "Could not update reimbursement");

@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useLottie } from "lottie-react";
 import { usePrefersReducedMotion } from "@/lib/motion";
+import { playSound, type AppSound } from "@/lib/sounds";
 import successAnimation from "@/assets/lottie/success.json";
 import deleteAnimation from "@/assets/lottie/delete-success.json";
 import reimbursementPaidAnimation from "@/assets/lottie/reimbursement-paid.json";
@@ -28,7 +29,18 @@ const AUTO_DISMISS_MS = 2200;
 const REDUCED_DISMISS_MS = 900;
 const LOTTIE_SIZE = 220;
 
-const VARIANT = {
+const VARIANT: Record<
+  SuccessOverlayVariant,
+  {
+    animation: object;
+    defaultTitle: string;
+    accent: string;
+    testId: string;
+    dismissMs: number;
+    lottieSize: number;
+    sound: AppSound | null;
+  }
+> = {
   added: {
     animation: successAnimation,
     defaultTitle: "Expense added",
@@ -36,6 +48,7 @@ const VARIANT = {
     testId: "expense-success-overlay",
     dismissMs: AUTO_DISMISS_MS,
     lottieSize: LOTTIE_SIZE,
+    sound: "success",
   },
   deleted: {
     animation: deleteAnimation,
@@ -44,8 +57,9 @@ const VARIANT = {
     testId: "expense-delete-overlay",
     dismissMs: AUTO_DISMISS_MS,
     lottieSize: LOTTIE_SIZE,
+    sound: "whoosh",
   },
-  /** Sylvia/Kavin marks a reimbursement paid (thank-you bow). */
+  /** Marks a reimbursement paid (thank-you bow). */
   reimbursement_paid: {
     animation: reimbursementPaidAnimation,
     defaultTitle: "Marked paid",
@@ -53,6 +67,7 @@ const VARIANT = {
     testId: "reimbursement-paid-overlay",
     dismissMs: 2600,
     lottieSize: 260,
+    sound: "paid",
   },
   /** Requester confirms they received the money (coin rain). */
   reimbursement_received: {
@@ -62,8 +77,9 @@ const VARIANT = {
     testId: "reimbursement-received-overlay",
     dismissMs: 3200,
     lottieSize: 260,
+    sound: null,
   },
-} as const;
+};
 
 /** Offsets from the Lottie center (px). */
 const PARTICLES = [
@@ -223,12 +239,13 @@ export function SuccessOverlay({
 
   useEffect(() => {
     if (!open) return;
+    if (config.sound) playSound(config.sound);
     const id = window.setTimeout(
       onClose,
       reduced ? REDUCED_DISMISS_MS : config.dismissMs,
     );
     return () => window.clearTimeout(id);
-  }, [open, onClose, reduced, config.dismissMs]);
+  }, [open, onClose, reduced, config.dismissMs, config.sound]);
 
   const size = config.lottieSize;
 

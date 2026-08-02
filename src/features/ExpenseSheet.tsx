@@ -72,8 +72,19 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const existingReimbursement = editing ? reimbursementByExpenseId[editing.id] : undefined;
   const reimbursementLocked = existingReimbursement?.status === "awaiting_confirmation";
 
+  // Only hydrate/reset when the sheet opens or the edited expense changes —
+  // not when reimbursements refresh in the background (that was wiping drafts).
+  const hydrateKey = open ? (editing?.id ?? "new") : null;
+  const lastHydrateKey = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open || hydrateKey == null) {
+      lastHydrateKey.current = null;
+      return;
+    }
+    if (lastHydrateKey.current === hydrateKey) return;
+    lastHydrateKey.current = hydrateKey;
+
     if (editing) {
       setAmount(String(editing.amount));
       setMerchant(editing.merchant);
@@ -102,7 +113,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         setCustomPartnerShare("");
       }
       if (editing.receiptId) {
-        repo.getReceipt(editing.receiptId).then((r) => setReceiptPreview(r?.dataUrl ?? null));
+        void repo.getReceipt(editing.receiptId).then((r) => setReceiptPreview(r?.dataUrl ?? null));
       } else {
         setReceiptPreview(null);
       }
@@ -121,8 +132,14 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setReceiptPreview(null);
     }
     setErrors({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editing, reimbursementByExpenseId]);
+  }, [
+    open,
+    hydrateKey,
+    editing,
+    reimbursementByExpenseId,
+    activeCategories,
+    repo,
+  ]);
 
   const clearReceipt = () => {
     if (receiptPreview?.startsWith("blob:")) URL.revokeObjectURL(receiptPreview);
