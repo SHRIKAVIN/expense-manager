@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Screen, ScreenHeader } from "@/layout/Screen";
 import { Card } from "@/components/Card";
@@ -9,6 +10,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MonthPicker } from "@/components/MonthPicker";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { ExpenseDetailSheet } from "@/features/ExpenseDetailSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { useAppData } from "@/data/AppDataProvider";
@@ -22,6 +24,7 @@ import {
   formatDayHeading,
   isOverallPeriod,
   monthLabel,
+  OVERALL_MONTH_KEY,
   todayISO,
 } from "@/lib/format";
 import {
@@ -32,6 +35,13 @@ import {
   ListIcon,
   SearchIcon,
 } from "@/lib/icons";
+import {
+  collectPopularTags,
+  expenseHasTag,
+  expenseMatchesQuery,
+  formatTagLabel,
+  normalizeTag,
+} from "@/lib/tags";
 import type { Expense } from "@/lib/types";
 import { listItemVariants } from "@/lib/motion";
 
@@ -55,12 +65,18 @@ export function TransactionsScreen() {
   const currency = user?.currency ?? "INR";
   const { expenses, categories, categoriesById, removeExpense } = useAppData();
   const { show } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonthKey);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
+  const [activeTag, setActiveTag] = useState<string | null>(() =>
+    normalizeTag(searchParams.get("tag") ?? ""),
+  );
   const [activeCat, setActiveCat] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [viewing, setViewing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState<{
     amountLabel: string;
@@ -75,30 +91,87 @@ export function TransactionsScreen() {
     );
   }, [expenses]);
 
+  const popularTags = useMemo(() => collectPopularTags(expenses), [expenses]);
+  const isGlobalSearch = Boolean(search.trim() || activeTag);
+
   useEffect(() => {
     if (!minMonth) return;
     if (isOverallPeriod(selectedMonth)) return;
     if (selectedMonth < minMonth) setSelectedMonth(minMonth);
   }, [minMonth, selectedMonth]);
 
+  // Deep-link: /transactions?q=…&tag=…&focus=1
+  useEffect(() => {
+    const q = searchParams.get("q");
+    const tag = normalizeTag(searchParams.get("tag") ?? "");
+    if (q != null) setSearch(q);
+    setActiveTag(tag);
+    if (q || tag) setSelectedMonth(OVERALL_MONTH_KEY);
+    if (searchParams.get("focus") === "1") {
+      window.setTimeout(() => searchInputRef.current?.focus(), 50);
+      const next = new URLSearchParams(searchParams);
+      next.delete("focus");
+      setSearchParams(next, { replace: true });
+    }
+    // Only react to inbound URL changes, not every local keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!isGlobalSearch) return;
+    if (!isOverallPeriod(selectedMonth)) setSelectedMonth(OVERALL_MONTH_KEY);
+  }, [isGlobalSearch, selectedMonth]);
+
   const activeCategories = categories.filter((c) => !c.archived);
   const monthBounds = useMemo(() => monthDateBounds(selectedMonth), [selectedMonth]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return filterByMonth(expenses, selectedMonth).filter((e) => {
+    const q = search.trim();
+    const monthScoped = isGlobalSearch ? expenses : filterByMonth(expenses, selectedMonth);
+    return monthScoped.filter((e) => {
       if (activeCat && e.categoryId !== activeCat) return false;
+      if (activeTag && !expenseHasTag(e, activeTag)) return false;
       if (!q) return true;
-      return (
-        e.merchant.toLowerCase().includes(q) ||
-        (e.notes ?? "").toLowerCase().includes(q) ||
-        (e.paymentMethod ?? "").toLowerCase().includes(q) ||
-        (categoriesById[e.categoryId]?.name ?? "").toLowerCase().includes(q)
+      return expenseMatchesQuery(
+        {
+          amount: e.amount,
+          merchant: e.merchant,
+          notes: e.notes,
+          paymentMethod: e.paymentMethod,
+          tags: e.tags,
+          categoryName: categoriesById[e.categoryId]?.name,
+        },
+        q,
       );
     });
-  }, [expenses, search, activeCat, categoriesById, selectedMonth]);
+  }, [
+    expenses,
+    search,
+    activeCat,
+    activeTag,
+    categoriesById,
+    selectedMonth,
+    isGlobalSearch,
+  ]);
 
   const groups = useMemo(() => groupByDay(filtered), [filtered]);
+
+  const onSearchChange = (value: string) => {
+    setSearch(value);
+    const next = new URLSearchParams(searchParams);
+    if (value.trim()) next.set("q", value);
+    else next.delete("q");
+    setSearchParams(next, { replace: true });
+  };
+
+  const onTagToggle = (tag: string) => {
+    const nextTag = activeTag === tag ? null : tag;
+    setActiveTag(nextTag);
+    const next = new URLSearchParams(searchParams);
+    if (nextTag) next.set("tag", nextTag);
+    else next.delete("tag");
+    setSearchParams(next, { replace: true });
+  };
 
   const confirmDelete = async () => {
     if (!confirmTarget) return;
@@ -144,21 +217,53 @@ export function TransactionsScreen() {
           minMonth={minMonth}
           data-testid="transactions-month-select"
         />
+        {isGlobalSearch && (
+          <p className="text-caption text-ink-muted-48 mt-2 px-1">
+            Searching all time — clear search/tags to filter by month again.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 mb-5" data-testid="transactions-filters">
         <TextField
+          ref={searchInputRef}
           shape="pill"
-          placeholder="Search merchants, notes…"
+          placeholder="Search merchant, notes, amount, #tags…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => onSearchChange(e.target.value)}
           clearable
-          onClear={() => setSearch("")}
+          onClear={() => onSearchChange("")}
           leftAdornment={<SearchIcon size={18} />}
           data-testid="transactions-search"
         />
-        <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5" data-testid="transactions-category-chips">
-          <Chip selected={activeCat === null} onClick={() => setActiveCat(null)} data-testid="transactions-chip-all">
+
+        {popularTags.length > 0 && (
+          <div
+            className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5"
+            data-testid="transactions-tag-chips"
+          >
+            {popularTags.map((tag) => (
+              <Chip
+                key={tag}
+                selected={activeTag === tag}
+                onClick={() => onTagToggle(tag)}
+                data-testid={`transactions-tag-${tag}`}
+              >
+                {formatTagLabel(tag)}
+              </Chip>
+            ))}
+          </div>
+        )}
+
+        <div
+          className="flex gap-2 overflow-x-auto no-scrollbar -mx-5 px-5"
+          data-testid="transactions-category-chips"
+        >
+          <Chip
+            selected={activeCat === null}
+            onClick={() => setActiveCat(null)}
+            data-testid="transactions-chip-all"
+          >
             All
           </Chip>
           {activeCategories.map((c) => (
@@ -200,10 +305,15 @@ export function TransactionsScreen() {
               >
                 <div className="px-5 pb-5 pt-1 flex flex-col gap-4 border-t border-divider-soft">
                   <p className="text-caption text-ink-muted-48">
-                    Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"} in{" "}
-                    {monthLabel(selectedMonth)}
+                    Showing {filtered.length} transaction{filtered.length === 1 ? "" : "s"}
+                    {isGlobalSearch ? " (all time)" : ` in ${monthLabel(selectedMonth)}`}
                   </p>
-                  <Button variant="secondary" fullWidth onClick={exportPdf} data-testid="transactions-export-pdf">
+                  <Button
+                    variant="secondary"
+                    fullWidth
+                    onClick={exportPdf}
+                    data-testid="transactions-export-pdf"
+                  >
                     <DownloadIcon size={18} /> Download PDF
                   </Button>
                 </div>
@@ -221,7 +331,7 @@ export function TransactionsScreen() {
             subcopy={
               expenses.length === 0
                 ? "Tap the + button to record your first expense."
-                : `Try a different search, category, or month.`
+                : "Try a different search, tag, category, or month."
             }
           />
         </Card>
@@ -248,8 +358,9 @@ export function TransactionsScreen() {
                         expense={e}
                         category={categoriesById[e.categoryId]}
                         currency={currency}
+                        onOpen={setViewing}
                         onEdit={setEditing}
-                        onDelete={(e) => setConfirmTarget(e)}
+                        onDelete={(exp) => setConfirmTarget(exp)}
                         deletePending={confirmTarget?.id === e.id}
                       />
                     </motion.div>
@@ -261,6 +372,13 @@ export function TransactionsScreen() {
         </div>
       )}
 
+      <ExpenseDetailSheet
+        expense={viewing}
+        category={viewing ? categoriesById[viewing.categoryId] : undefined}
+        currency={currency}
+        onClose={() => setViewing(null)}
+        onEdit={setEditing}
+      />
       <ExpenseSheet open={!!editing} editing={editing} onClose={() => setEditing(null)} />
       <ConfirmDialog
         open={!!confirmTarget}

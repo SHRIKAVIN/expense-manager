@@ -36,6 +36,7 @@ export interface DbExpense {
   date: string;
   payment_method: string | null;
   notes: string | null;
+  tags: string[] | null;
   receipt_id: string | null;
   recurring_id: string | null;
   recurring_period: string | null;

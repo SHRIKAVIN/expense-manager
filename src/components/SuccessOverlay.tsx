@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { useLottie } from "lottie-react";
-import { usePrefersReducedMotion } from "@/lib/motion";
-import { playSound, type AppSound } from "@/lib/sounds";
+import { usePrefersReducedMotion, backdropSmooth, modalSmooth, sheetSmooth } from "@/lib/motion";
 import successAnimation from "@/assets/lottie/success.json";
 import deleteAnimation from "@/assets/lottie/delete-success.json";
 import reimbursementPaidAnimation from "@/assets/lottie/reimbursement-paid.json";
@@ -38,7 +37,6 @@ const VARIANT: Record<
     testId: string;
     dismissMs: number;
     lottieSize: number;
-    sound: AppSound | null;
   }
 > = {
   added: {
@@ -48,7 +46,6 @@ const VARIANT: Record<
     testId: "expense-success-overlay",
     dismissMs: AUTO_DISMISS_MS,
     lottieSize: LOTTIE_SIZE,
-    sound: "success",
   },
   deleted: {
     animation: deleteAnimation,
@@ -57,7 +54,6 @@ const VARIANT: Record<
     testId: "expense-delete-overlay",
     dismissMs: AUTO_DISMISS_MS,
     lottieSize: LOTTIE_SIZE,
-    sound: "whoosh",
   },
   /** Marks a reimbursement paid (thank-you bow). */
   reimbursement_paid: {
@@ -67,7 +63,6 @@ const VARIANT: Record<
     testId: "reimbursement-paid-overlay",
     dismissMs: 2600,
     lottieSize: 260,
-    sound: "paid",
   },
   /** Requester confirms they received the money (coin rain). */
   reimbursement_received: {
@@ -77,7 +72,6 @@ const VARIANT: Record<
     testId: "reimbursement-received-overlay",
     dismissMs: 3200,
     lottieSize: 260,
-    sound: null,
   },
 };
 
@@ -239,13 +233,12 @@ export function SuccessOverlay({
 
   useEffect(() => {
     if (!open) return;
-    if (config.sound) playSound(config.sound);
     const id = window.setTimeout(
       onClose,
       reduced ? REDUCED_DISMISS_MS : config.dismissMs,
     );
     return () => window.clearTimeout(id);
-  }, [open, onClose, reduced, config.dismissMs, config.sound]);
+  }, [open, onClose, reduced, config.dismissMs]);
 
   const size = config.lottieSize;
 
@@ -262,14 +255,15 @@ export function SuccessOverlay({
           initial={reduced ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reduced ? 0 : 0.22 }}
+          transition={reduced ? { duration: 0 } : backdropSmooth}
         >
           <motion.div
             className="relative z-10 flex items-center justify-center"
             style={{ width: size, height: size }}
-            initial={reduced ? false : { scale: 0.86, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: reduced ? 0 : 0.28, ease: "easeOut" }}
+            initial={reduced ? false : { scale: 0.92, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={reduced ? undefined : { scale: 0.92, opacity: 0, y: 12 }}
+            transition={reduced ? { duration: 0 } : sheetSmooth}
           >
             <SuccessIconEffects reduced={reduced} accent={config.accent} />
             <div className="relative z-10">
@@ -278,9 +272,14 @@ export function SuccessOverlay({
           </motion.div>
           <motion.div
             className="relative z-10 flex flex-col items-center gap-1.5 text-center"
-            initial={reduced ? false : { opacity: 0, y: 10 }}
+            initial={reduced ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: reduced ? 0 : 0.28, delay: reduced ? 0 : 0.35, ease: "easeOut" }}
+            exit={reduced ? undefined : { opacity: 0, y: 10 }}
+            transition={
+              reduced
+                ? { duration: 0 }
+                : { ...modalSmooth, delay: reduced ? 0 : 0.08 }
+            }
           >
             <p className="text-[2.5rem] font-bold tabular-nums leading-none tracking-tight text-ink sm:text-[3rem]">
               {amountLabel}

@@ -8,11 +8,16 @@ import { usePrefersReducedMotion } from "@/lib/motion";
 import { Lightbox } from "@/components/Lightbox";
 import { cn } from "@/lib/cn";
 import { isReimbursementLogEntry, reimbursementLogTag } from "@/lib/reimbursementDisplay";
+import { formatTagLabel } from "@/lib/tags";
+
+const ACTION_WIDTH = 72;
+const OPEN_OFFSET = -ACTION_WIDTH * 2;
 
 interface ExpenseRowProps {
   expense: Expense;
   category?: Category;
   currency: string;
+  onOpen: (e: Expense) => void;
   onEdit: (e: Expense) => void;
   onDelete: (e: Expense) => void;
   /** True while the delete confirmation dialog is open for this row. */
@@ -39,6 +44,7 @@ export function ExpenseRow({
   expense,
   category,
   currency,
+  onOpen,
   onEdit,
   onDelete,
   deletePending = false,
@@ -50,14 +56,25 @@ export function ExpenseRow({
   const isLogEntry = isReimbursementLogEntry(expense);
   const reduced = usePrefersReducedMotion();
   const x = useMotionValue(0);
-  const revealOpacity = useTransform(x, [-80, -20], [1, 0]);
+  const revealOpacity = useTransform(x, [OPEN_OFFSET + 24, -16], [1, 0]);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const canWrite = can.writeExpenses;
   const canEdit = canWrite && !isLogEntry;
   const wasDeletePending = useRef(false);
+  /** Ignore the synthetic click that fires right after a drag ends. */
+  const skipClick = useRef(false);
+  const openOffset = canEdit ? OPEN_OFFSET : -ACTION_WIDTH;
 
   const resetSwipe = () => {
+    setActionsOpen(false);
+    skipClick.current = false;
     void animate(x, 0, { type: "spring", stiffness: 500, damping: 40 });
+  };
+
+  const snapOpen = () => {
+    setActionsOpen(true);
+    void animate(x, openOffset, { type: "spring", stiffness: 500, damping: 40 });
   };
 
   useEffect(() => {
@@ -65,21 +82,40 @@ export function ExpenseRow({
       resetSwipe();
     }
     wasDeletePending.current = deletePending;
-  }, [deletePending, x]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deletePending]);
 
-  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
-    if (info.offset.x < -80) {
-      onDelete(expense);
-      x.set(Math.min(info.offset.x, -80));
-      return;
-    }
-    resetSwipe();
+  const handleDragStart = () => {
+    skipClick.current = false;
+  };
+
+  const handleDrag = (_: unknown, info: { offset: { x: number } }) => {
+    if (Math.abs(info.offset.x) > 8) skipClick.current = true;
+  };
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
+    const shouldOpen = info.offset.x < openOffset / 2 || info.velocity.x < -400;
+    if (shouldOpen) snapOpen();
+    else resetSwipe();
   };
 
   const openReceipt = async () => {
     if (!expense.receiptId) return;
     const r = await repo.getReceipt(expense.receiptId);
     if (r) setLightbox(r.dataUrl);
+  };
+
+  const handleRowClick = () => {
+    // Consume the post-drag click once, then allow normal taps again.
+    if (skipClick.current) {
+      skipClick.current = false;
+      return;
+    }
+    if (actionsOpen || Math.abs(x.get()) > 8) {
+      resetSwipe();
+      return;
+    }
+    onOpen(expense);
   };
 
   const rowInner = (
@@ -117,6 +153,11 @@ export function ExpenseRow({
               : ` · awaiting ${pendingReimbursement.payerName}`
             : ""}
         </p>
+        {expense.tags && expense.tags.length > 0 ? (
+          <p className="text-fine-print text-ink-muted-48 mt-0.5 truncate">
+            {expense.tags.map(formatTagLabel).join(" ")}
+          </p>
+        ) : null}
         {showDate && (
           <p className="text-fine-print text-ink-muted-48 mt-0.5">{formatDate(expense.date)}</p>
         )}
@@ -139,7 +180,10 @@ export function ExpenseRow({
             <button
               type="button"
               aria-label="Edit"
-              onClick={() => onEdit(expense)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(expense);
+              }}
               className="h-9 w-9 rounded-full flex items-center justify-center text-primary outline-none"
             >
               <EditIcon size={18} />
@@ -148,7 +192,10 @@ export function ExpenseRow({
           <button
             type="button"
             aria-label="Delete"
-            onClick={() => onDelete(expense)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(expense);
+            }}
             className="h-9 w-9 rounded-full flex items-center justify-center text-ink-muted-48 outline-none"
           >
             <TrashIcon size={18} />
@@ -164,37 +211,61 @@ export function ExpenseRow({
         {canWrite && (
           <motion.div
             style={{ opacity: revealOpacity }}
-            className="lg:hidden absolute inset-y-0 right-0 w-20 flex items-center justify-center text-ink-muted-48"
+            className="lg:hidden absolute inset-y-0 right-0 flex items-stretch"
           >
-            <TrashIcon size={22} />
+            {canEdit && (
+              <button
+                type="button"
+                aria-label="Edit"
+                data-testid={`expense-swipe-edit-${expense.id}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  skipClick.current = false;
+                  setActionsOpen(false);
+                  x.set(0);
+                  onEdit(expense);
+                }}
+                className="w-[72px] flex flex-col items-center justify-center gap-1 bg-primary text-on-primary outline-none"
+              >
+                <EditIcon size={20} />
+                <span className="text-[11px] font-semibold">Edit</span>
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Delete"
+              data-testid={`expense-swipe-delete-${expense.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                skipClick.current = false;
+                onDelete(expense);
+              }}
+              className="w-[72px] flex flex-col items-center justify-center gap-1 bg-red-600 text-white outline-none"
+            >
+              <TrashIcon size={20} />
+              <span className="text-[11px] font-semibold">Delete</span>
+            </button>
           </motion.div>
         )}
 
-        {canEdit ? (
+        {canWrite ? (
           <motion.div
             drag={reduced ? false : "x"}
-            dragConstraints={{ left: -96, right: 0 }}
-            dragElastic={0.1}
+            dragConstraints={{ left: openOffset, right: 0 }}
+            dragElastic={0.08}
             style={{ x }}
-            onClick={() => onEdit(expense)}
+            onDragStart={handleDragStart}
+            onDrag={handleDrag}
             onDragEnd={handleDragEnd}
-            className="cursor-pointer bg-canvas lg:cursor-default"
-          >
-            {rowInner}
-          </motion.div>
-        ) : canWrite ? (
-          <motion.div
-            drag={reduced ? false : "x"}
-            dragConstraints={{ left: -96, right: 0 }}
-            dragElastic={0.1}
-            style={{ x }}
-            onDragEnd={handleDragEnd}
-            className="bg-canvas"
+            onClick={handleRowClick}
+            className="cursor-pointer bg-canvas relative z-[1] lg:cursor-pointer"
           >
             {rowInner}
           </motion.div>
         ) : (
-          rowInner
+          <div className="cursor-pointer bg-canvas" onClick={() => onOpen(expense)}>
+            {rowInner}
+          </div>
         )}
       </div>
       <Lightbox src={lightbox} onClose={() => setLightbox(null)} />

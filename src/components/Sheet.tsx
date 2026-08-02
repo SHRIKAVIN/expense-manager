@@ -1,12 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
-import {
-  backdropVariants,
-  modalVariants,
-  sheetVariants,
-  usePrefersReducedMotion,
-} from "@/lib/motion";
+import { sheetSmooth, backdropSmooth, modalSmooth, usePrefersReducedMotion } from "@/lib/motion";
 import { useIsDesktop } from "@/lib/useMediaQuery";
 import { useVisualViewportOverlay } from "@/lib/useVisualViewportOverlay";
 import { Button } from "./Button";
@@ -22,16 +17,23 @@ interface SheetProps {
 }
 
 /**
- * Bottom sheet on mobile (slide up, spring), centered fade+scale modal on desktop.
+ * Bottom sheet on mobile — mirrored smooth slide up/down.
+ * Centered fade+scale modal on desktop.
  * On iOS the overlay is pinned to the visual viewport so the sheet stays at the
- * bottom when the keyboard opens.
+ * true bottom when the software keyboard opens.
  */
 export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
   const isDesktop = useIsDesktop();
   const reduced = usePrefersReducedMotion();
   const overlayRef = useRef<HTMLDivElement>(null);
+  /** Keep viewport pinning until the exit animation finishes. */
+  const [mounted, setMounted] = useState(open);
 
-  useVisualViewportOverlay(overlayRef, open && !isDesktop);
+  useEffect(() => {
+    if (open) setMounted(true);
+  }, [open]);
+
+  useVisualViewportOverlay(overlayRef, mounted && !isDesktop);
 
   useEffect(() => {
     if (!open) return;
@@ -42,8 +44,16 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const panelTransition = reduced
+    ? { duration: 0 }
+    : isDesktop
+      ? modalSmooth
+      : sheetSmooth;
+
+  const backdropTransition = reduced ? { duration: 0 } : backdropSmooth;
+
   const content = (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={() => setMounted(false)}>
       {open && (
         <motion.div
           key="sheet-root"
@@ -55,11 +65,10 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
         >
           <motion.div
             className="absolute inset-0 bg-surface-black"
-            variants={backdropVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: reduced ? 0 : 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={backdropTransition}
             onClick={onClose}
           />
           <motion.div
@@ -67,11 +76,23 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
             aria-modal="true"
             aria-label={title}
             data-testid="sheet-panel"
-            className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[min(92dvh,100%)] flex flex-col shrink-0"
-            variants={isDesktop ? modalVariants : sheetVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
+            className="relative w-full lg:max-w-lg bg-canvas border border-hairline rounded-t-lg lg:rounded-lg max-h-[min(92dvh,100%)] flex flex-col shrink-0 will-change-transform"
+            initial={
+              isDesktop
+                ? { opacity: 0, scale: 0.98, y: 16 }
+                : { y: "100%" }
+            }
+            animate={
+              isDesktop
+                ? { opacity: 1, scale: 1, y: 0 }
+                : { y: 0 }
+            }
+            exit={
+              isDesktop
+                ? { opacity: 0, scale: 0.98, y: 16 }
+                : { y: "100%" }
+            }
+            transition={panelTransition}
           >
             <div className="flex items-center justify-between px-6 pt-6 pb-3 shrink-0">
               <h2 className="text-tagline text-ink">{title}</h2>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "@/lib/icons";
-import { backdropVariants, usePrefersReducedMotion } from "@/lib/motion";
+import { backdropSmooth, sheetSmooth, usePrefersReducedMotion } from "@/lib/motion";
 
 interface LightboxProps {
   src: string | null;
@@ -196,39 +196,59 @@ function ZoomableImage({ src }: { src: string }) {
 /** Full-screen receipt view with pinch / double-tap zoom and pan. */
 export function Lightbox({ src, onClose }: LightboxProps) {
   const reduced = usePrefersReducedMotion();
+  const [cached, setCached] = useState<string | null>(src);
+
+  useEffect(() => {
+    if (src) setCached(src);
+  }, [src]);
+
+  const shown = src ?? cached;
+  const open = Boolean(src);
+  const fade = reduced ? { duration: 0 } : backdropSmooth;
+  const panel = reduced ? { duration: 0 } : sheetSmooth;
+
   return createPortal(
-    <AnimatePresence>
-      {src && (
+    <AnimatePresence onExitComplete={() => setCached(null)}>
+      {open && shown && (
         <motion.div
+          key="lightbox"
           className="fixed inset-0 z-[70] flex flex-col items-center justify-end pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-14 px-4 sm:justify-center sm:pb-6 sm:p-6"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 1 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: reduced ? 0 : 0.2 }}
+          exit={{ opacity: 1 }}
         >
           <motion.div
             className="absolute inset-0 bg-surface-black backdrop-blur-[2px]"
-            variants={backdropVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: reduced ? 0 : 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={fade}
             onClick={onClose}
           />
-          <div className="relative z-10 flex w-full max-w-lg flex-1 min-h-0 flex-col items-center justify-center sm:max-h-[72dvh]">
+          <motion.div
+            className="relative z-10 flex w-full max-w-lg flex-1 min-h-0 flex-col items-center justify-center sm:max-h-[72dvh] will-change-transform"
+            initial={{ opacity: 0, y: 24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 24, scale: 0.98 }}
+            transition={panel}
+          >
             <div className="relative h-full w-full max-h-[58dvh] sm:max-h-[65dvh]">
-              <ZoomableImage src={src} />
+              <ZoomableImage src={shown} />
             </div>
-          </div>
-          <button
+          </motion.div>
+          <motion.button
             type="button"
             aria-label="Close"
             onClick={onClose}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={panel}
             className="relative z-20 mt-4 h-12 min-w-[7.5rem] rounded-pill bg-chip-translucent px-6 backdrop-blur flex items-center justify-center gap-2 text-body-strong text-ink outline-none sm:absolute sm:bottom-6 sm:right-6 sm:mt-0 sm:h-11 sm:min-w-0 sm:w-11 sm:rounded-full sm:px-0"
           >
             <CloseIcon size={22} />
             <span className="sm:hidden">Close</span>
-          </button>
+          </motion.button>
         </motion.div>
       )}
     </AnimatePresence>,

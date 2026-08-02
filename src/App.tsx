@@ -27,7 +27,6 @@ import { BudgetAlerts } from "@/features/BudgetAlerts";
 import { AppLogoMark } from "@/components/AppLogoMark";
 import { notify } from "@/lib/notifications";
 import { daysUntil, relativeDue } from "@/lib/format";
-import { bindAudioUnlock } from "@/lib/sounds";
 
 function Splash() {
   return (
@@ -35,11 +34,6 @@ function Splash() {
       <AppLogoMark size={48} className="animate-pulse" />
     </div>
   );
-}
-
-function AudioUnlock() {
-  useEffect(() => bindAudioUnlock(), []);
-  return null;
 }
 
 function RecurringReminders() {
@@ -112,7 +106,6 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <ToastProvider>
-          <AudioUnlock />
           <Suspense fallback={<Splash />}>
             <Routes>
               <Route path="/dev" element={<DevScreen />} />

@@ -17,6 +17,7 @@ import type {
   SessionUser,
 } from "@/lib/types";
 import { monthKey } from "@/lib/format";
+import { expenseMatchesQuery } from "@/lib/tags";
 import { advanceRecurringDate } from "@/lib/recurringDate";
 
 function advanceDate(iso: string, frequency: RecurringFrequency): string {
@@ -121,12 +122,18 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (filters?.month) rows = rows.filter((e) => monthKey(e.date) === filters.month);
       if (filters?.categoryId) rows = rows.filter((e) => e.categoryId === filters.categoryId);
       if (filters?.search) {
-        const q = filters.search.toLowerCase();
-        rows = rows.filter(
-          (e) =>
-            e.merchant.toLowerCase().includes(q) ||
-            (e.notes ?? "").toLowerCase().includes(q) ||
-            (e.paymentMethod ?? "").toLowerCase().includes(q),
+        const q = filters.search;
+        rows = rows.filter((e) =>
+          expenseMatchesQuery(
+            {
+              amount: e.amount,
+              merchant: e.merchant,
+              notes: e.notes,
+              paymentMethod: e.paymentMethod,
+              tags: e.tags,
+            },
+            q,
+          ),
         );
       }
       return rows.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.createdAt - a.createdAt));
@@ -142,6 +149,7 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
       if (!(input.amount > 0)) throw new RepositoryError("validation", "Amount must be greater than 0.");
       if (!input.categoryId) throw new RepositoryError("validation", "Category is required.");
       const now = Date.now();
+      const tags = input.tags?.length ? [...input.tags] : undefined;
       const exp: Expense = {
         id: uid("exp"),
         userId,
@@ -151,6 +159,7 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         date: input.date,
         paymentMethod: input.paymentMethod?.trim() || undefined,
         notes: input.notes?.trim() || undefined,
+        tags,
         receiptId: input.receiptId,
         recurringId: input.recurringId,
         recurringPeriod: input.recurringPeriod,
@@ -194,7 +203,17 @@ export function createLocalRepository(user: SessionUser): ExpenseRepository {
         throw new RepositoryError("validation", "Amount must be greater than 0.");
       }
       const { requestReimbursement, clearReimbursement, ...expensePatch } = patch;
-      const next: Expense = { ...exp, ...expensePatch, updatedAt: Date.now() };
+      const next: Expense = {
+        ...exp,
+        ...expensePatch,
+        tags:
+          expensePatch.tags !== undefined
+            ? expensePatch.tags.length
+              ? [...expensePatch.tags]
+              : undefined
+            : exp.tags,
+        updatedAt: Date.now(),
+      };
       await db.expenses.put(next);
 
       const existingReimb = await db.reimbursements

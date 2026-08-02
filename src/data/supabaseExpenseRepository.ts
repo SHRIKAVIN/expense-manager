@@ -8,6 +8,7 @@ import {
   toRecurring,
 } from "@/lib/supabase/mappers";
 import { monthKey } from "@/lib/format";
+import { expenseMatchesQuery } from "@/lib/tags";
 import { advanceRecurringDate } from "@/lib/recurringDate";
 import { DEFAULT_CATEGORIES } from "./defaults";
 import {
@@ -161,12 +162,18 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       if (filters?.month) rows = rows.filter((e) => monthKey(e.date) === filters.month);
       if (filters?.categoryId) rows = rows.filter((e) => e.categoryId === filters.categoryId);
       if (filters?.search) {
-        const q = filters.search.toLowerCase();
-        rows = rows.filter(
-          (e) =>
-            e.merchant.toLowerCase().includes(q) ||
-            (e.notes ?? "").toLowerCase().includes(q) ||
-            (e.paymentMethod ?? "").toLowerCase().includes(q),
+        const q = filters.search;
+        rows = rows.filter((e) =>
+          expenseMatchesQuery(
+            {
+              amount: e.amount,
+              merchant: e.merchant,
+              notes: e.notes,
+              paymentMethod: e.paymentMethod,
+              tags: e.tags,
+            },
+            q,
+          ),
         );
       }
       return rows;
@@ -188,6 +195,7 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
       if (!(input.amount > 0)) throwDb("Amount must be greater than 0.");
       if (!input.categoryId) throwDb("Category is required.");
       const now = new Date().toISOString();
+      const tags = input.tags?.length ? [...input.tags] : [];
       const { data, error } = await sb()
         .from("expenses")
         .insert({
@@ -198,6 +206,7 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
           date: input.date,
           payment_method: input.paymentMethod?.trim() || null,
           notes: input.notes?.trim() || null,
+          tags,
           receipt_id: input.receiptId ?? null,
           recurring_id: input.recurringId ?? null,
           recurring_period: input.recurringPeriod ?? null,
@@ -252,6 +261,7 @@ export function createSupabaseRepository(user: SessionUser): ExpenseRepository {
         updates.payment_method = patch.paymentMethod.trim() || null;
       }
       if (patch.notes !== undefined) updates.notes = patch.notes.trim() || null;
+      if (patch.tags !== undefined) updates.tags = patch.tags.length ? [...patch.tags] : [];
       if (patch.receiptId !== undefined) updates.receipt_id = patch.receiptId ?? null;
 
       const { data, error } = await sb()

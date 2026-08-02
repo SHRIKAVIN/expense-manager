@@ -211,6 +211,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           date: input.date,
           paymentMethod: input.paymentMethod,
           notes: input.notes,
+          tags: input.tags?.length ? [...input.tags] : undefined,
           recurringId: input.recurringId,
           recurringPeriod: input.recurringPeriod,
           createdAt: now,

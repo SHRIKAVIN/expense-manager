@@ -57,6 +57,7 @@ create table if not exists public.expenses (
   date date not null,
   payment_method text,
   notes text,
+  tags text[] not null default '{}',
   receipt_id uuid references public.receipts (id) on delete set null,
   recurring_id uuid references public.recurring (id) on delete set null,
   recurring_period text,

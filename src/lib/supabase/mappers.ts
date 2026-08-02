@@ -57,6 +57,7 @@ export function toExpense(row: DbExpense): Expense {
     date: row.date,
     paymentMethod: row.payment_method ?? undefined,
     notes: row.notes ?? undefined,
+    tags: row.tags?.length ? [...row.tags] : undefined,
     receiptId: row.receipt_id ?? undefined,
     recurringId: row.recurring_id ?? undefined,
     recurringPeriod: row.recurring_period ?? undefined,

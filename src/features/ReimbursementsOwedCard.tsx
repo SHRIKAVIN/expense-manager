@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/Card";
 import { Button } from "@/components/Button";
 import { SuccessOverlay } from "@/components/SuccessOverlay";
+import { SwipeDeck } from "@/components/SwipeDeck";
 import { useAuth } from "@/auth/AuthProvider";
 import { getReimbursementPartner } from "@/auth/quickSwitch";
 import { useAppData } from "@/data/AppDataProvider";
@@ -124,7 +125,9 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
             <div className="min-w-0">
               <p className="text-tagline text-ink">Reimbursements owed</p>
               <p className="text-caption text-ink-muted-48 mt-1">
-                Tap Pay to mark as settled
+                {reimbursementsToPay.length > 1
+                  ? "Swipe to browse · tap Pay to mark as settled"
+                  : "Tap Pay to mark as settled"}
               </p>
             </div>
             {reimbursementsToPay.length > 1 && (
@@ -154,31 +157,37 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
             </div>
           )}
 
-          {reimbursementsToPay.map((req) => (
-            <div
-              key={req.id}
-              className="flex items-center gap-3 rounded-md border border-hairline bg-canvas-parchment px-4 py-3"
-              data-testid={`reimbursement-owed-${req.id}`}
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-body-strong text-ink truncate">{req.merchant}</p>
-                <p className="text-caption text-ink-muted-48">
-                  {req.requesterName} · {formatCurrency(req.amount, currency)}
-                </p>
+          <SwipeDeck
+            items={reimbursementsToPay}
+            getKey={(req) => req.id}
+            label="Reimbursements you owe"
+          >
+            {(req) => (
+              <div
+                className="flex h-full items-center gap-3 rounded-md border border-hairline bg-canvas-parchment px-4 py-4"
+                data-testid={`reimbursement-owed-${req.id}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-body-strong text-ink truncate">{req.merchant}</p>
+                  <p className="text-caption text-ink-muted-48 mt-0.5">{req.requesterName}</p>
+                  <p className="text-tagline text-primary tabular-nums mt-1">
+                    {formatCurrency(req.amount, currency)}
+                  </p>
+                </div>
+                {can.writeExpenses && (
+                  <Button
+                    variant="primary"
+                    className="shrink-0 px-4 py-2"
+                    disabled={busyId === req.id || busyId === "all" || !partnerPay}
+                    data-testid={`reimbursement-pay-now-${req.id}`}
+                    onClick={() => void markPaid([req])}
+                  >
+                    {busyId === req.id ? "Paying…" : "Pay"}
+                  </Button>
+                )}
               </div>
-              {can.writeExpenses && (
-                <Button
-                  variant="primary"
-                  className="shrink-0 px-4 py-2"
-                  disabled={busyId === req.id || busyId === "all" || !partnerPay}
-                  data-testid={`reimbursement-pay-now-${req.id}`}
-                  onClick={() => void markPaid([req])}
-                >
-                  {busyId === req.id ? "Paying…" : "Pay"}
-                </Button>
-              )}
-            </div>
-          ))}
+            )}
+          </SwipeDeck>
         </Card>
       ) : null}
 

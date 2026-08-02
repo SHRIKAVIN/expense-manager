@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { EmptyState } from "@/components/EmptyState";
 import { ExpenseRow } from "@/features/ExpenseRow";
 import { ExpenseSheet } from "@/features/ExpenseSheet";
+import { ExpenseDetailSheet } from "@/features/ExpenseDetailSheet";
 import { RecurringDetailSheet } from "@/features/RecurringDetailSheet";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { SuccessOverlay } from "@/components/SuccessOverlay";
@@ -48,6 +49,7 @@ export function DashboardScreen() {
   const { show } = useToast();
 
   const [editing, setEditing] = useState<Expense | null>(null);
+  const [viewing, setViewing] = useState<Expense | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Expense | null>(null);
   const [deleteSuccess, setDeleteSuccess] = useState<{
     amountLabel: string;
@@ -326,8 +328,9 @@ export function DashboardScreen() {
                   expense={e}
                   category={categoriesById[e.categoryId]}
                   currency={currency}
+                  onOpen={setViewing}
                   onEdit={setEditing}
-                  onDelete={(e) => setConfirmTarget(e)}
+                  onDelete={(exp) => setConfirmTarget(exp)}
                   deletePending={confirmTarget?.id === e.id}
                   showDate
                 />
@@ -337,6 +340,13 @@ export function DashboardScreen() {
         </div>
       )}
 
+      <ExpenseDetailSheet
+        expense={viewing}
+        category={viewing ? categoriesById[viewing.categoryId] : undefined}
+        currency={currency}
+        onClose={() => setViewing(null)}
+        onEdit={setEditing}
+      />
       <ExpenseSheet open={!!editing} editing={editing} onClose={() => setEditing(null)} />
       <RecurringDetailSheet
         recurring={viewingRecurring}

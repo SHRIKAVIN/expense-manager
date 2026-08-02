@@ -13,6 +13,7 @@ import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { compressImage } from "@/lib/image";
 import { cn } from "@/lib/cn";
 import { formatCurrency, todayISO } from "@/lib/format";
+import { formatTagsInput, parseTagsInput } from "@/lib/tags";
 import type { Expense } from "@/lib/types";
 
 interface ExpenseSheetProps {
@@ -55,6 +56,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
   const [date, setDate] = useState(todayISO());
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [requestReimbursement, setRequestReimbursement] = useState(false);
   /** How much of the bill the partner owes when requesting reimbursement. */
   const [splitMode, setSplitMode] = useState<"full" | "half" | "custom">("full");
@@ -92,6 +94,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setDate(editing.date);
       setPaymentMethod(editing.paymentMethod ?? "");
       setNotes(editing.notes ?? "");
+      setTagsInput(formatTagsInput(editing.tags));
       setReceiptId(editing.receiptId);
       setPendingReceipt(null);
       const activeReimb = reimbursementByExpenseId[editing.id];
@@ -124,6 +127,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
       setDate(todayISO());
       setPaymentMethod("");
       setNotes("");
+      setTagsInput("");
       setRequestReimbursement(false);
       setSplitMode("full");
       setCustomPartnerShare("");
@@ -221,6 +225,7 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
         date,
         paymentMethod: paymentMethod.trim() || undefined,
         notes: notes.trim() || undefined,
+        tags: parseTagsInput(tagsInput),
         receiptId: finalReceiptId,
         requestReimbursement: !editing
           ? reimbPayload
@@ -427,6 +432,30 @@ export function ExpenseSheet({ open, onClose, editing }: ExpenseSheetProps) {
           onChange={(e) => setNotes(e.target.value)}
           data-testid="expense-notes"
         />
+        <div className="flex flex-col gap-2" data-testid="expense-tags">
+          <TextField
+            label="Tags (optional)"
+            placeholder="#trip #rent #groceries"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            data-testid="expense-tags-input"
+          />
+          <p className="text-caption text-ink-muted-48 -mt-1">
+            Space-separated. Used for search and filters.
+          </p>
+          {parseTagsInput(tagsInput).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {parseTagsInput(tagsInput).map((t) => (
+                <span
+                  key={t}
+                  className="inline-flex rounded-pill border border-hairline bg-canvas-parchment px-2.5 py-1 text-caption text-ink"
+                >
+                  #{t}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2" data-testid="expense-receipt">
           <span className="text-caption-strong text-ink-muted-80">Receipt (optional)</span>

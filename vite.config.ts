@@ -92,12 +92,9 @@ export default defineConfig({
         "icons/apple-touch-icon.png",
         "icons/apple-touch-icon-light.png",
         "icons/apple-touch-icon-dark.png",
-        "sounds/success-bell.mp3",
-        "sounds/paid-swish.mp3",
-        "sounds/whoosh.mp3",
       ],
       injectManifest: {
-        globPatterns: ["**/*.{js,css,html,svg,png,woff2,json,webp,mp3}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,woff2,json,webp}"],
         // Main bundle includes Lottie JSON (~2.3MB+). Default 2 MiB would omit it
         // from the SW precache, so nav/FAB Lotties never load in the installed PWA.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,

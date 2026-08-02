@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Sheet } from "@/components/Sheet";
 import { ProgressBar } from "@/components/ProgressBar";
 import { CategoryGlyph } from "@/lib/icons";
@@ -42,22 +43,27 @@ export function DashboardSummarySheet({
   budgetSpentByCategory = {},
   budgetTotals = { totalLimit: 0, totalSpentBudgeted: 0 },
 }: DashboardSummarySheetProps) {
-  const open = kind !== null;
+  const [cachedKind, setCachedKind] = useState<DashboardSummaryKind | null>(kind);
+
+  useEffect(() => {
+    if (kind) setCachedKind(kind);
+  }, [kind]);
+
+  const shown = kind ?? cachedKind;
+  if (!shown) return null;
 
   const title =
-    kind === "income"
+    shown === "income"
       ? `Income · ${monthLabel}`
-      : kind === "spent"
+      : shown === "spent"
         ? `Spent · ${monthLabel}`
-        : kind === "remaining"
+        : shown === "remaining"
           ? `Remaining · ${monthLabel}`
-          : kind === "budget"
-            ? `Budget health · ${monthLabel}`
-            : "";
+          : `Budget health · ${monthLabel}`;
 
   return (
-    <Sheet open={open} onClose={onClose} title={title}>
-      {kind === "income" && (
+    <Sheet open={kind !== null} onClose={onClose} title={title}>
+      {shown === "income" && (
         <div className="flex flex-col items-center text-center gap-4">
           <p className="text-display-md text-primary tabular-nums text-center">
             {formatCurrency(incomeTotal, currency)}
@@ -81,7 +87,7 @@ export function DashboardSummarySheet({
         </div>
       )}
 
-      {kind === "spent" && (
+      {shown === "spent" && (
         <div className="flex flex-col items-center text-center gap-4">
           <div className="text-center">
             <p className="text-display-md text-amber-700 tabular-nums text-center">
@@ -111,7 +117,7 @@ export function DashboardSummarySheet({
         </div>
       )}
 
-      {kind === "remaining" && (
+      {shown === "remaining" && (
         <div className="flex flex-col items-center text-center gap-4">
           <p
             className={`text-display-md tabular-nums text-center ${
@@ -147,7 +153,7 @@ export function DashboardSummarySheet({
         </div>
       )}
 
-      {kind === "budget" && (
+      {shown === "budget" && (
         <div className="flex flex-col items-center text-center gap-4">
           <div className="w-full text-center">
             <p className="text-body text-ink-muted-80 text-center">
@@ -178,7 +184,9 @@ export function DashboardSummarySheet({
                     </span>
                     <span
                       className={
-                        over ? "text-body-strong text-red-600 tabular-nums" : "text-body tabular-nums text-ink-muted-80"
+                        over
+                          ? "text-body-strong text-red-600 tabular-nums"
+                          : "text-body tabular-nums text-ink-muted-80"
                       }
                     >
                       {formatCurrency(spent, currency)} / {formatCurrency(limit, currency)}

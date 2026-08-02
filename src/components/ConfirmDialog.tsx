@@ -2,7 +2,11 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createPortal } from "react-dom";
 import { Button } from "./Button";
-import { backdropVariants, modalVariants, usePrefersReducedMotion } from "@/lib/motion";
+import {
+  backdropSmooth,
+  modalSmooth,
+  usePrefersReducedMotion,
+} from "@/lib/motion";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -38,29 +42,36 @@ export function ConfirmDialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  const fade = reduced ? { duration: 0 } : backdropSmooth;
+  const panel = reduced ? { duration: 0 } : modalSmooth;
+
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[55] flex items-center justify-center p-6">
+        <motion.div
+          key="confirm-dialog"
+          className="fixed inset-0 z-[55] flex items-center justify-center p-6"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 1 }}
+        >
           <motion.div
             className="absolute inset-0 bg-surface-black"
-            variants={backdropVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: reduced ? 0 : 0.2 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            exit={{ opacity: 0 }}
+            transition={fade}
             onClick={onClose}
           />
           <motion.div
             role="alertdialog"
             aria-modal="true"
             aria-label={title}
-            className="relative w-full max-w-sm bg-canvas border border-hairline rounded-lg p-6"
-            variants={modalVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-            transition={{ duration: reduced ? 0 : 0.18 }}
+            className="relative w-full max-w-sm bg-canvas border border-hairline rounded-lg p-6 will-change-transform"
+            initial={{ opacity: 0, scale: 0.98, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 16 }}
+            transition={panel}
           >
             <h2 className="text-tagline text-ink mb-2">{title}</h2>
             {message && <p className="text-body text-ink-muted-48 mb-6">{message}</p>}
@@ -73,7 +84,7 @@ export function ConfirmDialog({
               </Button>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,

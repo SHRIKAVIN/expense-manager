@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { goToDashboard } from "./navigateHome";
@@ -17,8 +17,11 @@ import {
 } from "@/auth/quickSwitch";
 import { useToast } from "@/components/Toast";
 import { useAppData } from "@/data/AppDataProvider";
+import { SearchIcon } from "@/lib/icons";
 import { pressProps, usePrefersReducedMotion } from "@/lib/motion";
 import type { Gender } from "@/lib/types";
+
+const PROFILE_DOUBLE_TAP_MS = 280;
 
 function PageIconBadge({ icon: Icon }: { icon: (typeof APP_NAV)[number]["icon"] }) {
   return <IconBadge3D icon={Icon} size="md" />;
@@ -52,6 +55,7 @@ export function HomeLogoButton({
 
 export function AppHeader() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const { user, canQuickSwitch, quickSwitchUsers, switchQuickUser, isQuickSwitchViewOnly } =
@@ -61,6 +65,14 @@ export function AppHeader() {
   const route = currentRoute(pathname);
   const title = route.label;
   const [switching, setSwitching] = useState(false);
+  const lastProfileTapAt = useRef(0);
+  const singleTapTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (singleTapTimer.current != null) window.clearTimeout(singleTapTimer.current);
+    };
+  }, []);
 
   const currentName = user?.email
     ? (getQuickSwitchAccountName(user.email) ?? user.displayName)
@@ -87,6 +99,37 @@ export function AppHeader() {
     }
   };
 
+  const toggleOtherProfile = () => {
+    const current = user?.email?.toLowerCase();
+    const other = quickSwitchUsers.find((acc) => acc.email.toLowerCase() !== current);
+    if (!other) {
+      setProfileOpen(true);
+      return;
+    }
+    void handleQuickSwitch(other.email);
+  };
+
+  /** Single tap → profile sheet; double tap → flip to the other account (Instagram-style). */
+  const onProfilePress = () => {
+    if (switching) return;
+    const now = Date.now();
+    if (now - lastProfileTapAt.current < PROFILE_DOUBLE_TAP_MS) {
+      if (singleTapTimer.current != null) {
+        window.clearTimeout(singleTapTimer.current);
+        singleTapTimer.current = null;
+      }
+      lastProfileTapAt.current = 0;
+      toggleOtherProfile();
+      return;
+    }
+    lastProfileTapAt.current = now;
+    if (singleTapTimer.current != null) window.clearTimeout(singleTapTimer.current);
+    singleTapTimer.current = window.setTimeout(() => {
+      singleTapTimer.current = null;
+      setProfileOpen(true);
+    }, PROFILE_DOUBLE_TAP_MS);
+  };
+
   return (
     <>
       <header
@@ -97,14 +140,26 @@ export function AppHeader() {
           <HomeLogoButton icon={route.icon} />
           <h1 className="text-tagline text-ink flex-1 min-w-0 truncate">{title}</h1>
 
+          <motion.button
+            type="button"
+            aria-label="Search expenses"
+            data-testid="nav-header-search"
+            onClick={() => navigate("/transactions?focus=1")}
+            whileTap={reduced ? undefined : pressProps.whileTap}
+            transition={pressProps.transition}
+            className="h-10 w-10 flex items-center justify-center rounded-full outline-none shrink-0 text-ink border border-hairline bg-canvas-parchment hover:bg-canvas"
+          >
+            <SearchIcon size={20} />
+          </motion.button>
+
           {canQuickSwitch && (
             <motion.button
               type="button"
-              aria-label="Switch profile"
+              aria-label="Switch profile. Double tap to flip accounts."
               aria-expanded={profileOpen}
               data-testid="nav-header-profile-switch"
               disabled={switching}
-              onClick={() => setProfileOpen(true)}
+              onClick={onProfilePress}
               whileTap={reduced ? undefined : pressProps.whileTap}
               transition={pressProps.transition}
               className={cn(
@@ -145,6 +200,8 @@ export function AppHeader() {
             {isQuickSwitchViewOnly
               ? `Viewing ${currentName} · read only`
               : `Signed in as ${currentName}`}
+            {" · "}
+            Double-tap the profile icon to flip accounts.
           </p>
           <div className="flex flex-col gap-2">
             {quickSwitchUsers.map((acc) => {

@@ -33,38 +33,66 @@ export const liquidSpring: Transition = {
   mass: 0.7,
 };
 
+/** Soft sheet slide — longer settle, little overshoot (open & close). */
 export const sheetSpring: Transition = {
   type: "spring",
-  stiffness: 300,
-  damping: 30,
+  stiffness: 280,
+  damping: 34,
+  mass: 0.95,
+  restDelta: 0.001,
+  restSpeed: 0.001,
+};
+
+/** Extra-smooth sheet tween (preferred for full-height bottom sheets). */
+export const sheetSmooth: Transition = {
+  type: "tween",
+  duration: 0.45,
+  ease: [0.32, 0.72, 0, 1],
+};
+
+/** Shared overlay curve for sheets, dialogs, lightbox, success. */
+export const overlayEase = [0.32, 0.72, 0, 1] as const;
+
+export const backdropSmooth: Transition = {
+  type: "tween",
+  duration: 0.4,
+  ease: overlayEase,
+};
+
+export const modalSmooth: Transition = {
+  type: "tween",
+  duration: 0.36,
+  ease: overlayEase,
 };
 
 export const backdropVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 0.4 },
+  hidden: { opacity: 0, transition: backdropSmooth },
+  visible: { opacity: 0.4, transition: backdropSmooth },
 };
 
 export const sheetVariants: Variants = {
   hidden: {
     y: "100%",
-    transition: sheetSpring,
+    transition: sheetSmooth,
   },
   visible: {
     y: 0,
-    transition: sheetSpring,
+    transition: sheetSmooth,
   },
 };
 
 export const modalVariants: Variants = {
   hidden: {
     opacity: 0,
-    scale: 0.96,
-    transition: { duration: 0.18, ease: "easeOut" },
+    scale: 0.98,
+    y: 12,
+    transition: modalSmooth,
   },
   visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.18, ease: "easeOut" },
+    y: 0,
+    transition: modalSmooth,
   },
 };
 
