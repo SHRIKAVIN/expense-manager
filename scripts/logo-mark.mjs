@@ -65,6 +65,31 @@ export function buildLogoMarkSvg({
 </svg>`;
 }
 
+/**
+ * Flat glyph on a transparent canvas, for the iOS home screen icon.
+ *
+ * iOS only stores one web-clip image, captured when the app is installed, so it
+ * can never be swapped for a dark variant afterwards. What it *can* do is
+ * generate its own light / dark / tinted backdrops — but only when the artwork
+ * is transparent and flat. Gradients, shadows and a baked-in tile all defeat
+ * that, so this variant drops them and uses a single brand blue that stays
+ * legible whether iOS puts white or near-black behind it.
+ *
+ * @param {{ size?: number; glyph?: string; scale?: number }} opts
+ */
+export function buildAdaptiveMarkSvg({ size = 512, glyph = "#0078e8", scale = 1.3 } = {}) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+  <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
+    <g stroke="${glyph}" stroke-width="34" stroke-linecap="round" fill="none">
+      <path d="M150 180h212"/>
+      <path d="M150 256h212"/>
+      <path d="M150 332h120"/>
+    </g>
+    <circle cx="362" cy="332" r="26" fill="${glyph}"/>
+  </g>
+</svg>`;
+}
+
 export const LOGO_THEMES = {
   light: { tileTop: "#0078e8", tileBottom: "#0055aa" },
   dark: { tileTop: "#2c2c2e", tileBottom: "#121214" },

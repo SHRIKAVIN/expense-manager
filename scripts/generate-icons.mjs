@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { buildLogoMarkSvg, LOGO_THEMES } from "./logo-mark.mjs";
+import { buildAdaptiveMarkSvg, buildLogoMarkSvg, LOGO_THEMES } from "./logo-mark.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(__dirname, "../public/icons");
@@ -62,3 +62,9 @@ await sharp(path.join(outDir, "apple-touch-icon-light.png")).toFile(
   path.join(outDir, "apple-touch-icon.png"),
 );
 console.log("alias apple-touch-icon.png <- apple-touch-icon-light.png");
+
+await sharp(Buffer.from(buildAdaptiveMarkSvg()))
+  .resize(180, 180)
+  .png()
+  .toFile(path.join(outDir, "apple-touch-icon-adaptive.png"));
+console.log("wrote apple-touch-icon-adaptive.png");

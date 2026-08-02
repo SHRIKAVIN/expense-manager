@@ -10,9 +10,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-light.png" media="(prefers-color-scheme: light)" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-dark.png" media="(prefers-color-scheme: dark)" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-light.png" data-app-icon />
+    <!--
+      Safari captures this icon once, when the user taps "Add to Home Screen",
+      and ignores `media` variants — so a theme-swapped tile could never follow
+      the device afterwards. The artwork is transparent and flat instead, which
+      lets iOS draw its own light / dark / tinted backdrop behind the glyph and
+      keep the installed icon in step with the system appearance.
+    -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-adaptive.png" />
     <title>Expense Manager</title>
     <script>
       // Persist theme before first paint to avoid a flash of the wrong theme (§5.5).
@@ -28,11 +33,7 @@
           document.documentElement.setAttribute("data-theme", pref);
           var themeMeta = document.querySelector('meta[name="theme-color"]');
           if (themeMeta) themeMeta.setAttribute("content", pref === "dark" ? "#1d1d1f" : "#ffffff");
-          var iconPath =
-            pref === "dark" ? "/icons/apple-touch-icon-dark.png" : "/icons/apple-touch-icon-light.png";
           var faviconPath = pref === "dark" ? "/favicon-dark.svg" : "/favicon-light.svg";
-          var appIcon = document.querySelector('link[rel="apple-touch-icon"][data-app-icon]');
-          if (appIcon) appIcon.setAttribute("href", iconPath);
           var appFavicon = document.querySelector('link[rel="icon"][data-app-favicon]');
           if (appFavicon) appFavicon.setAttribute("href", faviconPath);
         } catch (e) {
