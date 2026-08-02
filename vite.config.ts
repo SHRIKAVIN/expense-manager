@@ -92,7 +92,7 @@ export default defineConfig({
         "icons/apple-touch-icon.png",
         "icons/apple-touch-icon-light.png",
         "icons/apple-touch-icon-dark.png",
-        "icons/apple-touch-icon-adaptive.png",
+        "icons/apple-touch-icon-home.png",
       ],
       injectManifest: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2,json,webp}"],

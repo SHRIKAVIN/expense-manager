@@ -66,19 +66,28 @@ export function buildLogoMarkSvg({
 }
 
 /**
- * Flat glyph on a transparent canvas, for the iOS home screen icon.
+ * Flat glyph on an opaque light tile, for the iOS home screen icon.
  *
- * iOS only stores one web-clip image, captured when the app is installed, so it
- * can never be swapped for a dark variant afterwards. What it *can* do is
- * generate its own light / dark / tinted backdrops — but only when the artwork
- * is transparent and flat. Gradients, shadows and a baked-in tile all defeat
- * that, so this variant drops them and uses a single brand blue that stays
- * legible whether iOS puts white or near-black behind it.
+ * A web clip only ever stores one image, so Dark / Clear / Tinted are all
+ * derived from this single asset. Two things break the Default (light) look:
+ *   1. Any alpha → iOS fills the tile black in every appearance.
+ *   2. Pure #ffffff → Liquid Glass treats that fill as clear glass, so the
+ *      light appearance never shows a solid white tile even though Dark and
+ *      grey still derive correctly from the glyph.
+ * The background is therefore Apple's opaque light surface (#F2F2F7), which
+ * still reads as white on the Home Screen but survives Default appearance.
  *
- * @param {{ size?: number; glyph?: string; scale?: number }} opts
+ * @param {{ size?: number; glyph?: string; background?: string; scale?: number }} opts
  */
-export function buildAdaptiveMarkSvg({ size = 512, glyph = "#0078e8", scale = 1.3 } = {}) {
+export function buildAdaptiveMarkSvg({
+  size = 512,
+  glyph = "#0078e8",
+  // systemGroupedBackground (light) — near-white, never punched through as glass
+  background = "#F2F2F7",
+  scale = 1.3,
+} = {}) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="${background}"/>
   <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
     <g stroke="${glyph}" stroke-width="34" stroke-linecap="round" fill="none">
       <path d="M150 180h212"/>

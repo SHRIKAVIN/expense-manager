@@ -63,8 +63,14 @@ await sharp(path.join(outDir, "apple-touch-icon-light.png")).toFile(
 );
 console.log("alias apple-touch-icon.png <- apple-touch-icon-light.png");
 
-await sharp(Buffer.from(buildAdaptiveMarkSvg()))
+// Flattened on purpose: any alpha channel at all pushes iOS down its
+// transparent-web-clip path, where it fills the background with black in every
+// appearance. Background is #F2F2F7 (not #ffffff) so Liquid Glass Default keeps
+// a solid light tile instead of punching the fill through as clear glass.
+const adaptiveBg = "#F2F2F7";
+await sharp(Buffer.from(buildAdaptiveMarkSvg({ background: adaptiveBg })))
   .resize(180, 180)
+  .flatten({ background: adaptiveBg })
   .png()
-  .toFile(path.join(outDir, "apple-touch-icon-adaptive.png"));
-console.log("wrote apple-touch-icon-adaptive.png");
+  .toFile(path.join(outDir, "apple-touch-icon-home.png"));
+console.log("wrote apple-touch-icon-home.png");

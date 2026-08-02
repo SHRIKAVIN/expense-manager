@@ -13,11 +13,15 @@
     <!--
       Safari captures this icon once, when the user taps "Add to Home Screen",
       and ignores `media` variants — so a theme-swapped tile could never follow
-      the device afterwards. The artwork is transparent and flat instead, which
-      lets iOS draw its own light / dark / tinted backdrop behind the glyph and
-      keep the installed icon in step with the system appearance.
+      the device afterwards. What does track the theme is iOS's own Dark /
+      Clear / Tinted treatment, which it derives from this single flat image
+      (and only applies when the icon is declared here, not just in the
+      manifest). The tile is opaque #F2F2F7 (not transparent, not pure
+      #ffffff): alpha fills black, and pure white is punched through as glass
+      in Default/light, which is why the light appearance used to look wrong
+      while Dark and grey still worked.
     -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-adaptive.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-home.png" />
     <title>Expense Manager</title>
     <script>
       // Persist theme before first paint to avoid a flash of the wrong theme (§5.5).
