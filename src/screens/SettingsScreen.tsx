@@ -69,19 +69,10 @@ export function SettingsScreen() {
   const currency = user?.currency ?? "INR";
   const savedName = user?.displayName ?? "";
   const [name, setName] = useState(savedName);
-  const savedUpiId = user?.upiId ?? "";
-  const [upiId, setUpiId] = useState(savedUpiId);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [settlementsLoading, setSettlementsLoading] = useState(false);
   const nameDirty = name.trim() !== savedName.trim();
-  const upiIdDirty = upiId.trim() !== savedUpiId.trim();
-  const isValidUpiId = (val: string) => {
-    if (!val.trim()) return true; // empty is valid (optional)
-    // UPI ID format: anything@bankname or handle@upi
-    return /^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/.test(val.trim());
-  };
   const canSaveName = nameDirty && name.trim().length > 0 && !isQuickSwitchViewOnly;
-  const canSaveUpiId = upiIdDirty && isValidUpiId(upiId) && !isQuickSwitchViewOnly;
   const [perm, setPerm] = useState(notificationPermission());
   const [remindersOn, setRemindersOn] = useState(false);
   const [partnerAlertsOn, setPartnerAlertsOn] = useState(false);
@@ -148,8 +139,7 @@ export function SettingsScreen() {
 
   useEffect(() => {
     setName(user?.displayName ?? "");
-    setUpiId(user?.upiId ?? "");
-  }, [user?.displayName, user?.upiId]);
+  }, [user?.displayName]);
 
   useEffect(() => {
     if (!user?.id || !hasPartner) {
@@ -176,11 +166,8 @@ export function SettingsScreen() {
 
   const activeCategories = categories.filter((c) => !c.archived);
 
-  const saveProfile = async () => {
-    await updateProfile({
-      displayName: name.trim() || user?.displayName || "",
-      ...(upiIdDirty && { upiId: upiId.trim() }),
-    });
+  const saveName = async () => {
+    await updateProfile({ displayName: name.trim() || user?.displayName || "" });
     show("Profile updated");
   };
 
@@ -355,19 +342,8 @@ export function SettingsScreen() {
         <Section title="Account">
           <Card className="flex flex-col gap-5" data-testid="settings-account">
             <TextField label="Display name" value={name} onChange={(e) => setName(e.target.value)} data-testid="settings-display-name" />
-            <TextField
-              label="UPI ID"
-              value={upiId}
-              onChange={(e) => setUpiId(e.target.value)}
-              placeholder="yourname@bankname"
-              data-testid="settings-upi-id"
-              error={upiId.trim() && !isValidUpiId(upiId) ? "Invalid UPI ID format" : undefined}
-            />
-            <p className="text-caption text-ink-muted-48 -mt-3">
-              Used for receiving UPI payments from your partner. E.g., shrikavin@okaxis
-            </p>
             <div className="flex gap-3">
-              <Button variant="primary" onClick={saveProfile} disabled={!canSaveName && !canSaveUpiId} data-testid="settings-save-profile">
+              <Button variant="primary" onClick={saveName} disabled={!canSaveName} data-testid="settings-save-name">
                 Save
               </Button>
               <Button variant="secondary" onClick={logout} data-testid="settings-sign-out">

@@ -94,15 +94,3 @@ export async function clearSettlementHistory(): Promise<number> {
   if (error) throw new Error(error.message);
   return data?.length ?? 0;
 }
-
-/**
- * Confirm a UPI payment by marking a settlement from "initiated" → "payer_confirmed".
- * Called when payer confirms they successfully sent the money.
- */
-export async function confirmSettlementPaid(settlementId: string): Promise<void> {
-  if (!isSupabaseEnabled()) throw new Error("Supabase is required for settlements.");
-  const { error } = await getSupabase().rpc("confirm_settlement_paid", {
-    settlement_id: settlementId,
-  });
-  if (error) throw new Error(error.message);
-}
