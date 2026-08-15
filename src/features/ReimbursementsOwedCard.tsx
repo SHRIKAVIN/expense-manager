@@ -4,20 +4,21 @@ import { Button } from "@/components/Button";
 import { SuccessOverlay } from "@/components/SuccessOverlay";
 import { SwipeDeck } from "@/components/SwipeDeck";
 import { UpiConfirmationDialog } from "@/components/UpiConfirmationDialog";
+import { UpiQrModal } from "@/components/UpiQrModal";
 import { useAuth } from "@/auth/AuthProvider";
 import { getReimbursementPartner } from "@/auth/quickSwitch";
 import { useAppData } from "@/data/AppDataProvider";
 import { useToast } from "@/components/Toast";
 import { formatCurrency } from "@/lib/format";
 import { isOffline } from "@/lib/offlineQueue";
-import { buildUpiDeepLink } from "@/lib/upiDeepLink";
+import { buildUpiDeepLink, generateTransactionId, openUpiApp } from "@/lib/upiDeepLink";
 import {
   createSettlement,
   confirmSettlementPaid,
   fetchPartnerPaymentInfo,
   type PartnerPaymentInfo,
 } from "@/payments/settlementsApi";
-import type { ReimbursementRequest } from "@/lib/types";
+import type { ReimbursementRequest, Settlement } from "@/lib/types";
 
 function tapHaptic() {
   try {
@@ -41,12 +42,16 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
 
   // UPI payment flow state
   const [pendingUpiPayment, setPendingUpiPayment] = useState<{
-    settlementId: string;
     reimbursementId: string;
     amount: number;
     payeeName: string;
+    upiId: string;
+    upiUri: string;
   } | null>(null);
   const [confirmingUpiPayment, setConfirmingUpiPayment] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  /** In-flight settlement insert, started at launch and awaited at confirm time. */
+  const settlementRef = useRef<Promise<Settlement> | null>(null);
 
   const partnerEmail = user?.email ? getReimbursementPartner(user.email)?.email : undefined;
 
@@ -64,28 +69,16 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     };
   }, [partnerEmail, reimbursementsToPay.length]);
 
-  // Detect app return from UPI payment (visibilitychange/focus events)
-  useEffect(() => {
-    if (!pendingUpiPayment) return;
-
-    const onVisible = () => {
-      // Show confirmation dialog when app becomes visible
-      // Dialog will handle the confirm/cancel logic
-    };
-
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("focus", onVisible);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("focus", onVisible);
-    };
-  }, [pendingUpiPayment]);
-
   if (reimbursementsToPay.length === 0 && !celebration) {
     return null;
   }
 
-  const initiateUpiPayment = async (req: ReimbursementRequest) => {
+  /**
+   * Launches the UPI app. Deliberately NOT async: `openUpiApp()` must run
+   * inside the click gesture or iOS drops the app switch. The settlement row
+   * is created afterwards and awaited later, at confirmation time.
+   */
+  const initiateUpiPayment = (req: ReimbursementRequest) => {
     if (!user || !partnerPay?.upiId) return;
     if (settlingRef.current) return;
 
@@ -93,62 +86,76 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
     setBusyId(req.id);
     tapHaptic();
 
-    try {
-      // Create settlement with "initiated" status (not yet confirmed as paid)
-      const settlement = await createSettlement({
-        reimbursementRequestId: req.id,
-        payerId: user.id,
-        payeeId: partnerPay.id,
-        payerName: user.displayName || user.email,
-        payeeName: partnerPay.displayName || req.requesterName,
-        merchant: req.merchant,
-        amount: req.amount,
-        method: "upi",
-        note: `Settle ${req.merchant}`,
-        status: "initiated", // Not confirmed yet — waiting for user to confirm
-      });
+    const payeeLabel = partnerPay.displayName || partnerPay.email;
+    const upiParams = {
+      upiId: partnerPay.upiId,
+      payeeName: payeeLabel,
+      transactionNote: req.merchant,
+      amount: req.amount,
+      transactionId: generateTransactionId(),
+    };
 
-      // Store pending payment state so we can show dialog on return
-      setPendingUpiPayment({
-        settlementId: settlement.id,
-        reimbursementId: req.id,
-        amount: req.amount,
-        payeeName: partnerPay.displayName || partnerPay.email,
-      });
+    // Fire the app switch first, synchronously, while still in the gesture.
+    const platform = openUpiApp(upiParams);
 
-      // Build and open UPI deep link
-      const deepLink = buildUpiDeepLink({
-        upiId: partnerPay.upiId,
-        payeeName: partnerPay.displayName || partnerPay.email,
-        transactionNote: req.merchant,
-        amount: req.amount,
-      });
+    // Everything below is post-navigation bookkeeping.
+    settlementRef.current = createSettlement({
+      reimbursementRequestId: req.id,
+      payerId: user.id,
+      payeeId: partnerPay.id,
+      payerName: user.displayName || user.email,
+      payeeName: payeeLabel,
+      merchant: req.merchant,
+      amount: req.amount,
+      method: "upi",
+      note: `Settle ${req.merchant}`,
+      status: "initiated", // confirmed only once the payer says they sent it
+    });
+    settlementRef.current.catch(() => {
+      /* surfaced at confirmation time instead */
+    });
 
-      // Open the UPI app — will background this PWA
-      window.location.href = deepLink;
-    } catch (err) {
-      show(err instanceof Error ? err.message : "Could not initiate payment");
-      settlingRef.current = false;
-      setBusyId(null);
+    setPendingUpiPayment({
+      reimbursementId: req.id,
+      amount: req.amount,
+      payeeName: payeeLabel,
+      upiId: partnerPay.upiId,
+      upiUri: buildUpiDeepLink(upiParams),
+    });
+
+    if (platform === "other") {
+      // Desktop can't hand off to an app at all — QR is the only route.
+      setShowQr(true);
+    } else if (platform === "ios") {
+      // iOS may silently refuse the switch; arm the QR fail-safe, but only if
+      // we're still on screen (if the app opened, we've been backgrounded).
+      window.setTimeout(() => {
+        if (document.visibilityState === "visible") setShowQr(true);
+      }, 1200);
     }
   };
 
   const confirmUpiPaymentAndMarkPaid = async () => {
     if (!pendingUpiPayment || !user) return;
-    if (settlingRef.current) return;
+    if (confirmingUpiPayment) return;
 
-    settlingRef.current = true;
     setConfirmingUpiPayment(true);
 
     try {
+      // The settlement insert was kicked off at launch time; settle up with it now.
+      const settlement = await settlementRef.current;
+      if (!settlement) throw new Error("Could not record settlement");
+
       // Confirm the settlement (initiated → payer_confirmed)
-      await confirmSettlementPaid(pendingUpiPayment.settlementId);
+      await confirmSettlementPaid(settlement.id);
 
       // Mark the reimbursement as paid (pending → awaiting_confirmation)
       await markReimbursementPaid(pendingUpiPayment.reimbursementId);
 
       // Clear pending state and show success
       setPendingUpiPayment(null);
+      setShowQr(false);
+      settlementRef.current = null;
       setCelebration({
         amountLabel: formatCurrency(pendingUpiPayment.amount, currency),
         detail: `Waiting for ${pendingUpiPayment.payeeName} to confirm they received it`,
@@ -165,6 +172,8 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
   const cancelUpiPayment = () => {
     // User said no — settlement stays in "initiated" state, can retry later
     setPendingUpiPayment(null);
+    setShowQr(false);
+    settlementRef.current = null;
     setBusyId(null);
     settlingRef.current = false;
     show("You can try paying again when ready");
@@ -190,9 +199,11 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
       return;
     }
 
-    // If partner has UPI ID and only one reimbursement, use UPI flow
+    // If partner has UPI ID and only one reimbursement, use UPI flow.
+    // Note: nothing above this point awaits, so we're still inside the click
+    // gesture — required for the iOS app switch to be allowed.
     if (partnerPay.upiId && stillPending.length === 1) {
-      await initiateUpiPayment(stillPending[0]!);
+      initiateUpiPayment(stillPending[0]!);
       return;
     }
 
@@ -324,11 +335,22 @@ export function ReimbursementsOwedCard({ currency }: { currency: string }) {
         onClose={() => setCelebration(null)}
       />
 
+      <UpiQrModal
+        open={showQr && Boolean(pendingUpiPayment)}
+        upiUri={pendingUpiPayment?.upiUri ?? ""}
+        upiId={pendingUpiPayment?.upiId ?? ""}
+        payeeName={pendingUpiPayment?.payeeName ?? ""}
+        amount={pendingUpiPayment?.amount ?? 0}
+        currency={currency}
+        onClose={() => setShowQr(false)}
+      />
+
       <UpiConfirmationDialog
-        open={Boolean(pendingUpiPayment)}
+        open={Boolean(pendingUpiPayment) && !showQr}
         amount={pendingUpiPayment?.amount ?? 0}
         currency={currency}
         payeeName={pendingUpiPayment?.payeeName ?? ""}
+        upiId={pendingUpiPayment?.upiId ?? ""}
         onConfirm={confirmUpiPaymentAndMarkPaid}
         onCancel={cancelUpiPayment}
         isLoading={confirmingUpiPayment}

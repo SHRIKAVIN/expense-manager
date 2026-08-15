@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatCurrency } from "@/lib/format";
 import { Button } from "@/components/Button";
 
@@ -6,6 +7,8 @@ export interface UpiConfirmationDialogProps {
   amount: number;
   currency: string;
   payeeName: string;
+  /** Partner's UPI ID — shown copyable so the payment can be completed manually if the UPI app declines the deep link. */
+  upiId: string;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
@@ -15,17 +18,34 @@ export interface UpiConfirmationDialogProps {
  * Dialog shown after UPI app closes, asking user to confirm if payment succeeded.
  * Since UPI deep links have no callback, this is the lightweight way to know
  * if the money was actually sent.
+ *
+ * Also doubles as the manual-fallback surface: UPI apps sometimes decline
+ * deep-linked payments through their own risk checks, so the UPI ID and amount
+ * are shown copyable here for completing the transfer by hand.
  */
 export function UpiConfirmationDialog({
   open,
   amount,
   currency,
   payeeName,
+  upiId,
   onConfirm,
   onCancel,
   isLoading,
 }: UpiConfirmationDialogProps) {
+  const [copied, setCopied] = useState(false);
+
   if (!open) return null;
+
+  const copyUpiId = async () => {
+    try {
+      await navigator.clipboard.writeText(upiId);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — the id is visible on screen either way */
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40">
@@ -43,7 +63,25 @@ export function UpiConfirmationDialog({
             <p className="text-body text-ink">To: {payeeName}</p>
             <p className="text-body-strong text-primary tabular-nums">{formatCurrency(amount, currency)}</p>
           </div>
+          {upiId && (
+            <button
+              type="button"
+              onClick={() => void copyUpiId()}
+              className="flex w-full items-center justify-between gap-2 mt-3 pt-3 border-t border-hairline text-left"
+              data-testid="upi-copy-id"
+            >
+              <span className="text-caption text-ink truncate">{upiId}</span>
+              <span className="text-caption-strong text-primary shrink-0">
+                {copied ? "Copied" : "Copy"}
+              </span>
+            </button>
+          )}
         </div>
+
+        <p className="text-caption text-ink-muted-48">
+          If your UPI app declined the payment, copy the ID above and send it manually,
+          then come back and confirm.
+        </p>
 
         <div className="flex gap-3 pt-2">
           <Button
