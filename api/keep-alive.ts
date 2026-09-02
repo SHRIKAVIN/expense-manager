@@ -33,13 +33,10 @@ async function notifyTeams(params: {
   const webhookUrl = normalizeEnv(process.env.TEAMS_WEBHOOK_URL);
   if (!webhookUrl) return { sent: false, reason: 'TEAMS_WEBHOOK_URL not set' };
 
-  const vercelHost = normalizeEnv(process.env.VERCEL_URL);
-  const logoUrl = vercelHost
-    ? `https://${vercelHost}/icons/icon-192.png`
-    : 'https://expense-manager.vercel.app/icons/icon-192.png';
-
+  const logoUrl =
+    'https://raw.githubusercontent.com/SHRIKAVIN/expense-manager/main/public/icons/icon-192.png';
   const facts = [
-    { name: 'Project Name', value: 'EXPENSE MANAGER' },
+    { name: 'Project Name', value: 'Expense Manager' },
     { name: 'Job Status', value: params.success ? 'Success ✅' : 'Failed ❌' },
     { name: 'Timestamp', value: params.timestamp },
     { name: 'Source', value: 'Vercel Cron' },
@@ -58,7 +55,7 @@ async function notifyTeams(params: {
     title: 'Supabase Keep-Alive Notification',
     sections: [
       {
-        activityTitle: 'EXPENSE MANAGER',
+        activityTitle: 'Expense Manager',
         activitySubtitle: 'Vercel Cron keep-alive result',
         activityImage: logoUrl,
         facts,
