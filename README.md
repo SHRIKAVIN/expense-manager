@@ -108,6 +108,31 @@ on conflict (id) do update set webhook_secret = excluded.webhook_secret;
 5. **Both users** enable **Partner activity alerts** in Settings (registers their device).
 6. **iPhone:** Add to Home Screen (iOS 16.4+). Use **Test background push** in Settings, then close the app.
 
+## Supabase Keep-Alive
+
+Supabase free-tier projects pause after inactivity. This app keeps the DB warm via:
+
+1. **`/api/keep-alive`** — lightweight `SELECT` against Supabase
+2. **Vercel Cron** — once daily at 03:00 UTC (`0 3 * * *`) + Teams success/failure cards
+
+### Vercel env (Production)
+
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Supabase project URL (same as `VITE_SUPABASE_URL`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Keep-alive queries (bypasses RLS) |
+| `TEAMS_WEBHOOK_URL` | Teams alerts from Vercel Cron |
+
+Redeploy after adding env vars. Confirm in **Vercel → Settings → Cron Jobs**: path `/api/keep-alive`, schedule `0 3 * * *`.
+
+### Manual test
+
+```bash
+curl -sL https://your-app.vercel.app/api/keep-alive
+```
+
+Expect `"success": true` and `"teams": { "sent": false, "reason": "Not a Vercel Cron request..." }` (manual pings skip Teams).
+
 ## Getting started
 
 ```bash
@@ -121,6 +146,8 @@ npm run icons      # regenerate PWA icons from scripts/generate-icons.mjs
 ## Project structure
 
 ```
+api/
+  keep-alive.ts   # Vercel serverless keep-alive endpoint
 src/
   styles/        tokens.css (single source of color truth) + global styles
   lib/           types, formatting, analytics, motion, icons, helpers
