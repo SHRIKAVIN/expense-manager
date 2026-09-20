@@ -14,7 +14,6 @@ import { CountUp } from "@/components/CountUp";
 import { RoleBadge } from "@/components/RoleBadge";
 import { useToast } from "@/components/Toast";
 import { CameraIcon, FoodIcon, ListIcon, SearchIcon } from "@/lib/icons";
-import { UpiMatrixTester } from "@/features/UpiMatrixTester";
 
 function Row({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -45,8 +44,6 @@ export function DevScreen() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <UpiMatrixTester />
-
         <Row title="Typography ladder">
           <div className="flex flex-col gap-2 w-full">
             <span className="text-display-lg text-ink">Display LG</span>
